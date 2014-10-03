@@ -1,17 +1,40 @@
-Forms = (function() {
+/*
+ * Convenient tool to work with HTML forms in JavaScript "js-forms"
+ * Copyright (c) 2014 Tengiz Adamashvili
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+Forms = (function () {
     var fieldUniqueCounter = 1;
     var formsList = {};
     var tagsArr = ['input', 'textarea', 'select'];
     var defaults = {
-        hideClass : 'h',
-        classes : {
-            error : 'error',
-            warning : 'warning'
+        hideClass: 'h',
+        classes: {
+            error: 'error',
+            warning: 'warning'
         },
-        errorClass : 'error',
-        warningClass : 'warning',
-        templateFast : {
-            select : function(name, id, elements) {
+        errorClass: 'error',
+        warningClass: 'warning',
+        templateFast: {
+            select: function (name, id, elements) {
                 var str = '<select name="' + name + '" id="' + id + '">';
 
                 for (var i = 0; i < elements.length; i++) {
@@ -22,17 +45,17 @@ Forms = (function() {
 
                 return str;
             },
-            radio : function(name, id, elements) {
+            radio: function (name, id, elements) {
                 var str = '<table cellpadding="0" cellspacing="0" class="radio-table">';
 
                 for (var i = 0; i < elements.length; i++) {
                     str += '<tr>' +
-                            '<td class="radiobutton">' +
-                                 elements[i]['input'] +
-                            '</td>' +
-                            '<td class="radio_label">' +
-                                 elements[i]['label'] +
-                            '</td>' +
+                        '<td class="radiobutton">' +
+                        elements[i]['input'] +
+                        '</td>' +
+                        '<td class="radio_label">' +
+                        elements[i]['label'] +
+                        '</td>' +
                         '</tr>'
                 }
 
@@ -40,7 +63,7 @@ Forms = (function() {
 
                 return str;
             },
-            checkbox : function(name, id, elements) {
+            checkbox: function (name, id, elements) {
                 var str = '<table cellpadding="0" cellspacing="0" class="radio-table">';
 
                 for (var i = 0; i < elements.length; i++) {
@@ -59,15 +82,15 @@ Forms = (function() {
                 return str;
             }
         },
-        ajax : function(url, method, data, successCallback, errorCallback) {
+        ajax: function (url, method, data, successCallback, errorCallback) {
             var request = new XMLHttpRequest();
 
             request.open(method, url);
-            request.setRequestHeader("Content-Type","application/x-www-form-urlencoded; charset=UTF-8");
-            request.setRequestHeader('X-Requested-With','XMLHttpRequest');
+            request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             request.send(fieldValue.serialize(data, null));
 
-            request.onreadystatechange = function() {
+            request.onreadystatechange = function () {
                 if (request.status == 200 && request.readyState == 4) {
                     successCallback(request.response);
                 }
@@ -76,19 +99,20 @@ Forms = (function() {
                 }
             };
         },
-        onChange : function(a,b) {},
-        submitCallback : function(a,b,c) {
+        onChange: function (a, b) {
+        },
+        submitCallback: function (a, b, c) {
             c();
             return !0;
         },
-        validateCallback : function(a) {
+        validateCallback: function (a) {
             return !0;
         },
-        beforeSubmitCallback : function(c) {
+        beforeSubmitCallback: function (c) {
             c();
             return !0;
         },
-        afterSubmitCallback : function() {
+        afterSubmitCallback: function () {
             return !0;
         }
     };
@@ -132,7 +156,7 @@ Forms = (function() {
 
     var MSG_NO_CONFIG = 'No configuration passed',
         MSG_INITIALIZED = 'Form is initialized already',
-        MSG_NO_ELEMENT  =   'No such element on the page';
+        MSG_NO_ELEMENT = 'No such element on the page';
 
     var VALIDATION_ON_SUBMIT = 1,
         VALIDATION_ON_CHANGE = 2,
@@ -143,111 +167,111 @@ Forms = (function() {
         VALIDATION_KEY_WARN = 1;
 
     var validate = {
-        setWarningMessage : function(name, msg) {
+        setWarningMessage: function (name, msg) {
             if (!validate.methods[name]) validate.methods[name] = [];
             validate.methods[name][VALIDATION_KEY_WARN] = msg
         },
-        setErrorMessage : function(name, msg) {
+        setErrorMessage: function (name, msg) {
             if (!validate.methods[name]) validate.methods[name] = [];
             validate.methods[name][VALIDATION_KEY_ERR] = msg
         },
-        setTestFunction : function(name, func) {
+        setTestFunction: function (name, func) {
             if (!validate.methods[name]) validate.methods[name] = [];
             validate.methods[name][VALIDATION_KEY_TEST] = func
         },
-        set : function(name, data) {
+        set: function (name, data) {
             validate.methods[name] = data
         },
-        remove : function(name) {
+        remove: function (name) {
             delete validate.methods[name]
         },
-        methods : {
-            'multiple' : [
+        methods: {
+            'multiple': [
                 'Must be a multiple of {val}',
                 'Should be a multiple of {val}',
-                function(val, rule) {
-                    return val%rule === 0;
+                function (val, rule) {
+                    return val % rule === 0;
                 }
             ],
-            'email' : [
+            'email': [
                 'Wrong email format',
                 'Bad email format',
-                function(val, rule) {
+                function (val, rule) {
                     return /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(val)
                 }
             ],
-            'int' : [
+            'int': [
                 'Must be an integer',
                 'Should be an integer',
-                function(val, rule) {
+                function (val, rule) {
                     return parseInt(val, 10) == val;
                 }
             ],
-            'float' : [
+            'float': [
                 'Must be a decimal',
                 'Should be a decimal',
-                function(val, rule) {
+                function (val, rule) {
                     return /^-?\d{0,}([\.|\,]\d{0,})?$/.test(val);
                 }
             ],
-            'min' : [
+            'min': [
                 'Must be >= {val}',
                 'Value is lower than {val}',
-                function(val, rule) {
+                function (val, rule) {
                     return (parseFloat(val) || 0) >= (parseFloat(rule) || 0)
                 }
             ],
-            'max' : [
+            'max': [
                 'Must be <= {val}',
                 'Value is higher than {val}',
-                function(val, rule) {
+                function (val, rule) {
                     return (parseFloat(val) || 0) <= (parseFloat(rule) || 0)
                 }
             ],
-            'date' : [
+            'date': [
                 'Wrong date format',
                 'Bad date format',
-                function(val, rule) {
+                function (val, rule) {
                     return /^([1-9]|0[1-9]|1[012])[- \/.](0[1-9]|[1-9]|[12][0-9]|3[01])[- \/.](19|20)\d\d$/.test(val);
                 }
             ],
-            'length' : [
+            'length': [
                 'Must be {val} characters long',
                 'Should be {val} characters long',
-                function(val, rule) {
+                function (val, rule) {
                     return val.length == rule
                 }
             ],
-            'maxLength' : [
+            'maxLength': [
                 'Must be <= {val} characters long',
                 'Should be less than {val} characters long',
-                function(val, rule) {
+                function (val, rule) {
                     return val.length <= rule
                 }
             ],
-            'minLength' : [
+            'minLength': [
                 'Must be >= {val} characters long',
                 'Should be more than {val} characters long',
-                function(val, rule) {
+                function (val, rule) {
                     return val.length <= rule
                 }
             ],
-            'required' : [
+            'required': [
                 'Required field',
                 'This field is highly recommended to fill',
-                function(val, rule) {
+                function (val, rule) {
                     return !(val == '' || val == null || typeof val == undefined)
                 }
             ]
         },
-        hideError : function(warningObj) {
+        hideError: function (warningObj) {
             addClass(warningObj, defaults.hideClass);
         },
-        showError : function(warningObj, text) {
+        showError: function (warningObj, text) {
             warningObj.innerHTML = text;
             removeClass(warningObj, defaults.hideClass);
         },
-        field : function(form, fieldName, params, value) {
+        field: function (form, fieldName, params, value) {
             var fieldValid = !0;
             var valid = !0;
 
@@ -268,7 +292,7 @@ Forms = (function() {
                 if (!fieldValid) {
                     validate.showError(
                         form.getErrorContainer(fieldName),
-                        validate.methods[type][VALIDATION_KEY_ERR].supplant({val : params[DATA_TYPE_VALIDATE][type]})
+                        validate.methods[type][VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
                     );
                     if (form.container[fieldName].name !== undefined) {
                         addClass(form.container[fieldName], errorClass);
@@ -306,8 +330,6 @@ Forms = (function() {
                 }
 
                 if (!fieldValid) {
-                    console.log('getWarningContainer', fieldName, form.getWarningContainer(fieldName));
-
                     validate.showError(
                         form.getWarningContainer(fieldName),
                         validate.methods[type][VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
@@ -329,7 +351,7 @@ Forms = (function() {
             }
             return valid;
         },
-        process : function(form, fields) {
+        process: function (form, fields) {
             var container = form.container;
 
             var data = form.getFormData();
@@ -345,6 +367,7 @@ Forms = (function() {
             return valid;
         }
     };
+
     function differs(a, b) {
         if (typeof a == typeof b && ("string" == typeof b || "number" == typeof b))return a != b;
         if ("object" == typeof a && "object" == typeof b) {
@@ -354,16 +377,19 @@ Forms = (function() {
         } else if (typeof a != typeof b)return!0;
         return!1
     }
+
     function error() {
         throw new Error(Array.prototype.slice.call(arguments).join(', '))
     }
+
     function warning() {
         console.log(Array.prototype.slice.call(arguments).join(', '))
     }
+
     function setFieldValue(elem, value) {
         if (!elem) return;
 
-        var setValue = function(el, val) {
+        var setValue = function (el, val) {
             var tagName = el.tagName.toLowerCase();
 
             switch (tagName) {
@@ -439,23 +465,23 @@ Forms = (function() {
         setValue(elem, value);
     }
 
-    var addClass = function(element, className) {
+    var addClass = function (element, className) {
         if (hasClass(element, className)) return;
-        element.className = (element.className + ' ' +className).trim();
+        element.className = (element.className + ' ' + className).trim();
     };
-    var hasClass = function(element, className) {
+    var hasClass = function (element, className) {
         return (new RegExp("( |^)" + className + "( |$)", "g")).test(element.className);
     };
-    var removeClass = function(element, className) {
+    var removeClass = function (element, className) {
         var reg = new RegExp("( |^)" + className + "( |$)", "g");
-        element.className = element.className.replace(reg, function(a,b,c) {
-            return b==c ? c : ''
+        element.className = element.className.replace(reg, function (a, b, c) {
+            return b == c ? c : ''
         })
     };
 
     var fieldValue = {
-        allReg : /\[([a-zA-Z0-9-]*)\]/g,
-        isObjReg : /\[(.*)\]/g,
+        allReg: /\[([a-zA-Z0-9-]*)\]/g,
+        isObjReg: /\[(.*)\]/g,
         serialize: function (a, b) {
             var c = [];
             for (var d in a) {
@@ -464,7 +490,7 @@ Forms = (function() {
             }
             return c.join("&")
         },
-        get : function(fieldName, reference) {
+        get: function (fieldName, reference) {
             var arr = [fieldName.replace(fieldValue.isObjReg, '')];
             var match;
             while (match = fieldValue.allReg.exec(fieldName)) {
@@ -484,7 +510,7 @@ Forms = (function() {
 
             return tmpObj;
         },
-        setVal : function(namesArr, value, ref) {
+        setVal: function (namesArr, value, ref) {
             if (!namesArr.length) {
                 return;
             }
@@ -515,7 +541,7 @@ Forms = (function() {
             tmpObj = tmpObj[name] = (typeof tmpObj[name] == 'object' && tmpObj[name] !== null) ? tmpObj[name] : (next == '' ? [] : {});
             fieldValue.setVal(namesArr, value, tmpObj)
         },
-        set : function(fieldName, value, reference) {
+        set: function (fieldName, value, reference) {
             var freeVar = fieldName.replace(fieldValue.isObjReg, '');
             var arr = [];
             if (freeVar) arr.push(freeVar);
@@ -627,11 +653,12 @@ Forms = (function() {
 
         return result;
     }
+
     function setValues(form, data) {
         if (!data) return;
 
         var fired = {};
-        elementsProcess.call(form, function(elem) {
+        elementsProcess.call(form, function (elem) {
             var elName = elem.name;
             var value = fieldValue.get(elName, data);
 
@@ -644,6 +671,7 @@ Forms = (function() {
             fired[elem.name] = 1;
         });
     }
+
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
         obj.setAttribute('class', 'form_' + type + '_' + name);
@@ -651,6 +679,7 @@ Forms = (function() {
 
         return obj;
     }
+
     function createTextContainer(className) {
         var span = document.createElement('SPAN');
         span.className = className;
@@ -659,6 +688,7 @@ Forms = (function() {
 
         return span;
     }
+
     function setDefaultValues(form, fieldsList) {
         if (!fieldsList) return;
         for (var name in fieldsList) {
@@ -671,6 +701,7 @@ Forms = (function() {
             setFieldValue(form.container[name], fieldsList[name]['defaultVal']);
         }
     }
+
     function bind(obj, evt, fnc) {
         // W3C model
         if (obj.addEventListener) {
@@ -683,14 +714,14 @@ Forms = (function() {
         }
         // Browser don't support W3C or MSFT model, go on with traditional
         else {
-            evt = 'on'+evt;
-            if(typeof obj[evt] === 'function'){
+            evt = 'on' + evt;
+            if (typeof obj[evt] === 'function') {
                 // Object already has a function on traditional
                 // Let's wrap it with our own function inside another function
-                fnc = (function(f1,f2){
-                    return function(){
-                        f1.apply(this,arguments);
-                        f2.apply(this,arguments);
+                fnc = (function (f1, f2) {
+                    return function () {
+                        f1.apply(this, arguments);
+                        f2.apply(this, arguments);
                     }
                 })(obj[evt], fnc);
             }
@@ -698,6 +729,7 @@ Forms = (function() {
             return !0;
         }
     }
+
     function setAtributes(form, fieldsList) {
         if (!fieldsList) return;
 
@@ -732,30 +764,33 @@ Forms = (function() {
                                 for (var i = 0; i < attrArr.length; i++) {
                                     addClass(form.container[name], attrArr[i]);
                                 }
-                            } catch (e) {}
+                            } catch (e) {
+                            }
                         }
                         break;
                 }
             }
         }
     }
+
     function bindFormEvents(form) {
         var conf = form.getConfig();
 
         if (!(conf[PARAM_FLAGS] & FLAG_ASYNC)) {
-            form.submit = function() {
+            form.submit = function () {
                 form.container.submit.call(form.container);
             };
             return;
         }
 
-        var submit = function(callback) {
+        var submit = function (callback) {
             var submitCallback = conf[PARAM_SUBMIT_CALLBACK] || defaults.submitCallback,
                 validateCallback = conf[PARAM_ON_VALIDATE] || defaults.validateCallback,
                 beforeSubmit = conf[PARAM_BEFORE_SUBMIT] || defaults.beforeSubmitCallback,
                 afterSubmit = conf[PARAM_AFTER_SUBMIT] || defaults.afterSubmitCallback,
-                onSubmit = conf[PARAM_ON_SUBMIT] || function(callback) {
-                    callback = callback || function() {};
+                onSubmit = conf[PARAM_ON_SUBMIT] || function (callback) {
+                    callback = callback || function () {
+                    };
 
                     var isValid = form.validate();
                     validateCallback(isValid);
@@ -768,8 +803,8 @@ Forms = (function() {
                             }
                         }
 
-                        defaults.ajax(form.action, "POST", data, (function(cb) {
-                            return function(status, data) {
+                        defaults.ajax(form.action, "POST", data, (function (cb) {
+                            return function (status, data) {
                                 submitCallback(status, data, cb);
                             }
                         })(callback));
@@ -782,41 +817,43 @@ Forms = (function() {
                     return !1;
                 };
 
-            beforeSubmit(function() {
+            beforeSubmit(function () {
                 if (onSubmit(callback)) afterSubmit()
             });
         };
 
         form.container.submit = form.submit = submit;
 
-        bind(form.container, 'submit', function(e) {
-            if(e.preventDefault) e.preventDefault();
+        bind(form.container, 'submit', function (e) {
+            if (e.preventDefault) e.preventDefault();
             submit();
             e.returnValue = !1;
             return !1;
         });
     }
-    function fireEvent(obj, evt){
+
+    function fireEvent(obj, evt) {
         if (obj === undefined) return;
         var evObj;
-        if( document.createEvent ) {
+        if (document.createEvent) {
             evObj = document.createEvent('MouseEvents');
-            evObj.initEvent( evt, true, false );
+            evObj.initEvent(evt, true, false);
             if (obj.length && obj.name == undefined) {
-                for (var i = 0; i<obj.length; i++)  obj[i].dispatchEvent( evObj )
+                for (var i = 0; i < obj.length; i++)  obj[i].dispatchEvent(evObj)
                 return
             }
-            obj.dispatchEvent( evObj );
-        } else if( document.createEventObject ) { //IE
+            obj.dispatchEvent(evObj);
+        } else if (document.createEventObject) { //IE
             evObj = document.createEventObject();
             if (obj.fireEvent === undefined || typeof obj.fireEvent != 'function') {
                 return;
             }
-            obj.fireEvent( 'on' + evt, evObj );
+            obj.fireEvent('on' + evt, evObj);
         }
     }
+
     function bindInputEvents(validationType) {
-        var onChange = function(e, fieldName, type) {
+        var onChange = function (e, fieldName, type) {
             switch (type) {
                 case Forms.VALIDATION_ON_CHANGE:
                     if (e.type == 'blur') {
@@ -826,13 +863,13 @@ Forms = (function() {
                 case Forms.VALIDATION_ON_KEYUP:
 
 
-
                     this.validate(fieldName);
                     break;
             }
             var data = this.getFormData();
             var onChangeCallback = this.getConfig()[PARAM_ON_CHANGE] || defaults.onChange;
-            var onFieldChange = this.getConfig()[PARAM_ON_FIELD_CHANGE] || function(a,b) {};
+            var onFieldChange = this.getConfig()[PARAM_ON_FIELD_CHANGE] || function (a, b) {
+            };
 
             var savedValue = fieldValue.get(fieldName, this.valuesCache);
             var currentValue = fieldValue.get(fieldName, data);
@@ -844,20 +881,18 @@ Forms = (function() {
             }
             this.isChanged = isDifferent;
 
-            console.log('isDifferent', this.defaultFormData);
-
             if (differs(savedValue, currentValue)) {
                 onFieldChange(fieldName, currentValue);
                 fieldValue.set(fieldName, currentValue, this.valuesCache);
             }
         };
 
-        elementsProcess.call(this, function(elem) {
+        elementsProcess.call(this, function (elem) {
             if (elem.initialized) {
                 return;
             }
-            var eventFunc = function(n) {
-                return function(e) {
+            var eventFunc = function (n) {
+                return function (e) {
                     onChange.call(this, e, n, validationType)
                 }.bind(this)
             }.call(this, elem.name);
@@ -870,6 +905,7 @@ Forms = (function() {
             elem.initialized = !0;
         }.bind(this));
     }
+
     function elementsProcess(callback) {
         for (var i = 0; i < tagsArr.length; i++) {
             var elements = this.container.getElementsByTagName(tagsArr[i]);
@@ -879,6 +915,7 @@ Forms = (function() {
             }
         }
     }
+
     function findElementByNameAndType(parent, name, type) {
         if (parent.allChildren == undefined) {
             parent.allChildren = {};
@@ -898,6 +935,7 @@ Forms = (function() {
 
         return result[0] ? result : null;
     }
+
     function insertFields(form, fieldsList, uniqueLabels, debugMode, templates) {
         debugMode = debugMode || !1;
         uniqueLabels = uniqueLabels || !1;
@@ -916,6 +954,7 @@ Forms = (function() {
             tmp.appendChild(elem);
             return tmp.innerHTML;
         }
+
         function getTagNameByType(type) {
             switch (type) {
                 case 'option':
@@ -974,7 +1013,7 @@ Forms = (function() {
             return element;
         }
 
-        var getLabelElement = function(text, forId) {
+        var getLabelElement = function (text, forId) {
             var label = document.createElement('LABEL');
             label.innerHTML = text;
             label.setAttribute('for', forId);
@@ -1026,7 +1065,7 @@ Forms = (function() {
                 }
             }
 
-            form.fieldContainers[fieldName].innerHTML = (function(data, id, type, name, isLabel, templates) {
+            form.fieldContainers[fieldName].innerHTML = (function (data, id, type, name, isLabel, templates) {
                 /* creating an html to insert into fieldContainer */
                 var elementsData = [];
 
@@ -1045,7 +1084,7 @@ Forms = (function() {
                             tmpElement = createElementByFieldType('option');
                             tmpElement.value = '';
                             tmpElement.innerHTML = '';
-                            elementsData.push({input : elementToString(tmpElement)});
+                            elementsData.push({input: elementToString(tmpElement)});
                             i = 0;
                         }
 
@@ -1098,7 +1137,7 @@ Forms = (function() {
     }
 
     function clear() {
-        elementsProcess.call(this, function(el) {
+        elementsProcess.call(this, function (el) {
             this.setField(el.name, '')
         }.bind(this))
     }
@@ -1112,13 +1151,13 @@ Forms = (function() {
     })(document, "getElementsByClassName");
 
     return {
-        Form : function(conf) {
+        Form: function (conf) {
             var opt = {
-                cache : null,
-                config : conf || null,
-                initialized : !1,
-                defaultFormData : null,
-                container : null
+                cache: null,
+                config: conf || null,
+                initialized: !1,
+                defaultFormData: null,
+                container: null
             };
             var form = this;
 
@@ -1131,7 +1170,7 @@ Forms = (function() {
                 return !!c
             }
 
-            form.init = function(c) {
+            form.init = function (c) {
                 if (opt.initialized) {
                     warning(MSG_INITIALIZED);
                     return !1
@@ -1166,7 +1205,7 @@ Forms = (function() {
                 opt.config[PARAM_ID] = form.container.id;
             }
 
-            form.getFormData = function(emptyFields) {
+            form.getFormData = function (emptyFields) {
                 emptyFields = emptyFields || !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
                 return formToArray(form.container, emptyFields)
             };
@@ -1179,14 +1218,14 @@ Forms = (function() {
 
             form.action = opt.container.getAttribute('action');
 
-            form.setField = function(name, value) {
+            form.setField = function (name, value) {
                 setFieldValue(opt.container[name], value);
                 fireEvent(opt.container[name], 'formChange');
             };
-            form.getField = function(name) {
+            form.getField = function (name) {
                 return form.container[name];
             };
-            form.validate = function(fieldName) {
+            form.validate = function (fieldName) {
                 if (fieldName) {
                     var data = form.getFormData();
                     return validate.field(form, fieldName, opt.config[PARAM_FIELDS][fieldName], data[fieldName])
@@ -1208,11 +1247,11 @@ Forms = (function() {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name)
             };
 
-            form.initInputs = function() {
+            form.initInputs = function () {
                 /* go through all fields in the form. IE7 ".hasAttribute" fix */
-                elementsProcess.call(form, function(elem) {
+                elementsProcess.call(form, function (elem) {
                     if (elem.hasAttribute === undefined) {
-                        elem.hasAttribute = function(attrName) {
+                        elem.hasAttribute = function (attrName) {
                             return typeof this[attrName] !== 'undefined';
                         }
                     }
@@ -1231,7 +1270,7 @@ Forms = (function() {
                 /* bind change events */
                 bindInputEvents.call(form, opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT);
             };
-            form.saveChanges = function() {
+            form.saveChanges = function () {
                 /* stores saved changes */
                 form.defaultFormData = form.getFormData();
                 (opt.config[PARAM_ON_CHANGE] || defaults.onChange)(!1, form);
@@ -1271,7 +1310,7 @@ Forms = (function() {
                 form.validate();
             }
 
-            form.remove = function() {
+            form.remove = function () {
                 Forms.remove(opt.config[PARAM_ID]);
             };
 
@@ -1279,25 +1318,25 @@ Forms = (function() {
 
             formsList[opt.config[PARAM_ID]] = form;
         },
-        VALIDATION_ON_SUBMIT : VALIDATION_ON_SUBMIT,
-        VALIDATION_ON_CHANGE : VALIDATION_ON_CHANGE,
-        VALIDATION_ON_KEYUP  : VALIDATION_ON_KEYUP,
-        FLAG_DEBUG : FLAG_DEBUG,
-        FLAG_SUBMIT_EMPTY : FLAG_SUBMIT_EMPTY,
-        FLAG_UNIQUE_LABELS : FLAG_UNIQUE_LABELS,
-        FLAG_ASYNC : FLAG_ASYNC,
-        defaults : defaults,
-        remove : function(id) {
+        VALIDATION_ON_SUBMIT: VALIDATION_ON_SUBMIT,
+        VALIDATION_ON_CHANGE: VALIDATION_ON_CHANGE,
+        VALIDATION_ON_KEYUP: VALIDATION_ON_KEYUP,
+        FLAG_DEBUG: FLAG_DEBUG,
+        FLAG_SUBMIT_EMPTY: FLAG_SUBMIT_EMPTY,
+        FLAG_UNIQUE_LABELS: FLAG_UNIQUE_LABELS,
+        FLAG_ASYNC: FLAG_ASYNC,
+        defaults: defaults,
+        remove: function (id) {
             if (formsList[id]) delete formsList[id]
         },
-        validation : {
-            setWarningMessage : validate.setWarningMessage,
-            setErrorMessage : validate.setErrorMessage,
-            setTestFunction : validate.setTestFunction,
-            'set' : validate.set,
-            remove : validate.remove
+        validation: {
+            setWarningMessage: validate.setWarningMessage,
+            setErrorMessage: validate.setErrorMessage,
+            setTestFunction: validate.setTestFunction,
+            'set': validate.set,
+            remove: validate.remove
         },
-        getList : function() {
+        getList: function () {
             return formsList
         }
     }
