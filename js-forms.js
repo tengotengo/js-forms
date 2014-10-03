@@ -1196,41 +1196,6 @@ Forms = (function() {
             };
             form.clear = clear.bind(form);
 
-           /* var setTheErrorContainer = function(container) {
-                function createErrorContainer(name, type) {
-                    var obj = document.createElement('DIV');
-                    obj.setAttribute('type', type);
-                    obj.setAttribute('name', name);
-
-                    return obj;
-                }
-                function createErrorHolder(className) {
-                    var span = document.createElement('SPAN');
-                    span.className = className;
-
-                    addClass(span, defaults.hideClass);
-
-                    return span;
-                }
-
-                *//* setting error and warning containers if exist *//*
-                var errorContainer = findElementByNameAndType(container, fieldName, FIELD_TYPE_ERROR);
-                var warningContainer = findElementByNameAndType(container, fieldName, FIELD_TYPE_WARNING);
-                if (!errorContainer) {
-                    errorContainer = createErrorContainer(fieldName, FIELD_TYPE_ERROR);
-                    form.fieldContainers[fieldName].parentNode.insertBefore(errorContainer, form.fieldContainers[fieldName].nextSibling);
-                }
-                if (!warningContainer) {
-                    warningContainer = createErrorContainer(fieldName, FIELD_TYPE_WARNING);
-                    form.fieldContainers[fieldName].parentNode.insertBefore(warningContainer, form.fieldContainers[fieldName].nextSibling);
-                }
-                form.errorContainers[fieldName] = errorContainer;
-                form.warningContainers[fieldName] = warningContainer;
-
-                errorContainer.appendChild(createErrorHolder(form.getConfig()['errorClass'] || defaults.errorClass));
-                warningContainer.appendChild(createErrorHolder(form.getConfig()['warningClass'] || defaults.warningClass));
-            };*/
-
             form.notificationContainers = {};
             form.notificationContainers[FIELD_TYPE_ERROR] = {};
             form.notificationContainers[FIELD_TYPE_WARNING] = {};
