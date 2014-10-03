@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src="../js-forms.js"></script>
+    <link rel="stylesheet" href="forms.css" />
+</head>
+<body>
+    <form id="test-form" action="/">
+        <div class="form_field_a0"></div>
+        <div class="form_field_a1"></div>
+        <div class="form_field_a2"></div>
+        <div class="form_field_a3"></div>
+        <div class="form_field_a4"></div>
+        <div class="form_field_a5"></div>
+
+        <input type="text" name="q[asd]"/>
+        <input type="text" name="q[zxc]"/>
+        <input type="text" name="q[fg]"/>
+
+        <input type="text" name="a[]"/>
+        <input type="text" name="a[]"/>
+        <input type="text" name="a[]"/>
+
+        <div id="form-save-btn" class="btn">SAVE</div>
+    </form>
+
+    <div>JSON:</div>
+    <div id="json-form"></div>
+
+    <script type="text/javascript">
+        (function (w, d) {
+            try {
+                var data = {"a0":"1","a1":"axvxcv","a2":"1","a3":4,"a4":null,"a5":"","q":{"asd":"sdfg","zxc":"bnm","fg":"eee"},"a":["rrr","tttt","yyy"]};
+                var dataSample = {
+                    a0: {
+                        validate: {
+                            min: 0,
+                            int: 1
+                        },
+                        warning: {
+                            max: 100
+                        },
+                        type: 'textarea',
+                        defaultVal: 'xvxcvxcvb',
+                        label: 'Sample field textarea'
+                    },
+                    a1: {
+                        validate: {
+                            test: 1
+                        },
+                        warning: {
+                            max: 100
+                        },
+                        type: 'text',
+                        'class': ['awesome'],
+                        defaultVal: 'axvxcv',
+                        label: 'Sample field text'
+                    },
+                    a2: {
+                        validate: {
+                            required: 1
+                        },
+                        type: 'checkbox',
+                        defaultVal: true,
+                        data: {
+                            'Single checkbox': 1
+                        }
+                    },
+                    a3: {
+                        validate: {
+                            required: 1
+                        },
+                        type: 'checkbox',
+                        bitmask: true,
+                        data: {
+                            'Label 1': 1,
+                            'Label 2': 2,
+                            'Label 3': 4
+                        }
+                    },
+                    a4: {
+                        type: 'radio',
+                        data: {
+                            'Label 1': 1,
+                            'Label 2': 2,
+                            'Label 3': 3
+                        }
+                    },
+                    a5: {
+                        label: 'Select Label',
+                        type: 'select',
+                        data: {
+                            'item1': 1,
+                            'item2': 2,
+                            'item3': 3
+                        }
+                    }
+                };
+
+                var form = new Forms.Form({
+                    id : 'test-form',
+                    flags : Forms.FLAG_DEBUG | Forms.FLAG_SUBMIT_EMPTY | Forms.FLAG_UNIQUE_LABELS | Forms.FLAG_ASYNC,
+                    validationType : Forms.VALIDATION_ON_SUBMIT,
+                    params : {
+                        additionalParam : 123
+                    },
+                    onChange : function(isDifferent, form) {
+                        console.log(isDifferent);
+                    },
+                    onFieldChange : function(fieldName, value) {
+                        d.getElementById('json-form').innerHTML = JSON.stringify(form.getFormData())
+                    },
+                    fields : dataSample,
+                    data : data
+                });
+
+                d.getElementById('form-save-btn').addEventListener('click', function() {
+                    form.submit()
+                });
+
+            } catch (e) {
+                console.log(e);
+            }
+        })(window, document);
+    </script>
+</body>
+</html>

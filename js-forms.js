@@ -22,6 +22,11 @@
  */
 
 Forms = (function () {
+    String.prototype.supplant = function (a, b) {
+        return this.replace(/{([^{}]*)}/g, function (c, d) {
+            return void 0 != a[d] ? a[d] : b ? '' : c
+        })
+    };
     var fieldUniqueCounter = 1;
     var formsList = {};
     var tagsArr = ['input', 'textarea', 'select'];
@@ -84,6 +89,8 @@ Forms = (function () {
         },
         ajax: function (url, method, data, successCallback, errorCallback) {
             var request = new XMLHttpRequest();
+            errorCallback = errorCallback || function () {
+            };
 
             request.open(method, url);
             request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
@@ -100,6 +107,7 @@ Forms = (function () {
             };
         },
         onChange: function (a, b) {
+
         },
         submitCallback: function (a, b, c) {
             c();
@@ -454,7 +462,9 @@ Forms = (function () {
 
         /* in case if field name is xxx[] array */
         if (typeof value == 'object' && elem.length) {
-            for (var i = 0; i < elem.length; i++) setValue(elem[i], value[i]);
+            for (var i = 0; i < elem.length; i++) {
+                setValue(elem[i], value !== null && value[i] ? value[i] : null);
+            }
             return;
         }
         if (elem.length && !elem.tagName) {
@@ -480,17 +490,17 @@ Forms = (function () {
     };
 
     var fieldValue = {
-        allReg: /\[([a-zA-Z0-9-]*)\]/g,
-        isObjReg: /\[(.*)\]/g,
+        allReg : /\[([a-zA-Z0-9-]*)\]/g,
+        isObjReg : /\[(.*)\]/g,
         serialize: function (a, b) {
             var c = [];
             for (var d in a) {
                 var e = b ? b + "[" + d + "]" : d, f = a[d];
-                c.push("object" == typeof f ? fieldValue.serialize(f, e) : encodeURIComponent(e) + "=" + encodeURIComponent(f))
+                c.push("object" == typeof f && f !== null ? fieldValue.serialize(f, e) : encodeURIComponent(e) + "=" + (f === null ? '' : encodeURIComponent(f)))
             }
             return c.join("&")
         },
-        get: function (fieldName, reference) {
+        get : function(fieldName, reference) {
             var arr = [fieldName.replace(fieldValue.isObjReg, '')];
             var match;
             while (match = fieldValue.allReg.exec(fieldName)) {
@@ -510,7 +520,7 @@ Forms = (function () {
 
             return tmpObj;
         },
-        setVal: function (namesArr, value, ref) {
+        setVal : function(namesArr, value, ref) {
             if (!namesArr.length) {
                 return;
             }
@@ -541,7 +551,7 @@ Forms = (function () {
             tmpObj = tmpObj[name] = (typeof tmpObj[name] == 'object' && tmpObj[name] !== null) ? tmpObj[name] : (next == '' ? [] : {});
             fieldValue.setVal(namesArr, value, tmpObj)
         },
-        set: function (fieldName, value, reference) {
+        set : function(fieldName, value, reference) {
             var freeVar = fieldName.replace(fieldValue.isObjReg, '');
             var arr = [];
             if (freeVar) arr.push(freeVar);
@@ -550,7 +560,6 @@ Forms = (function () {
             while (match = fieldValue.allReg.exec(fieldName)) {
                 arr.push(match[1]);
             }
-
             fieldValue.setVal(arr, value, reference);
         }
     };
@@ -623,15 +632,16 @@ Forms = (function () {
                 return !1
             };
 
+
             if (!name || element.disabled || hasClass(element, 'default-text')) {
                 continue;
             }
 
-            if (emptyFields && fieldValue.get(name, result) === undefined) {
+            var value = getFieldValue(element);
+
+            if (emptyFields && fieldValue.get(name, result) === undefined && value === null) {
                 fieldValue.set(name, null, result);
             }
-
-            var value = getFieldValue(element);
 
             if (value === null ||
                 !emptyFields && ( value === '' ||
@@ -740,6 +750,7 @@ Forms = (function () {
                 switch (paramName) {
                     case DATA_TYPE_DISABLED:
                     case DATA_TYPE_BITMASK:
+                        if (!form.container[name]) break;
                         if (form.container[name].length) {
                             for (var i = 0; i < form.container[name].length; i++) {
                                 form.container[name][i].setAttribute(paramName, '1');
@@ -794,6 +805,7 @@ Forms = (function () {
 
                     var isValid = form.validate();
                     validateCallback(isValid);
+
                     if (isValid) {
                         var data = form.getFormData();
 
@@ -861,15 +873,12 @@ Forms = (function () {
                     }
                     break;
                 case Forms.VALIDATION_ON_KEYUP:
-
-
                     this.validate(fieldName);
                     break;
             }
             var data = this.getFormData();
             var onChangeCallback = this.getConfig()[PARAM_ON_CHANGE] || defaults.onChange;
-            var onFieldChange = this.getConfig()[PARAM_ON_FIELD_CHANGE] || function (a, b) {
-            };
+            var onFieldChange = this.getConfig()[PARAM_ON_FIELD_CHANGE] || function (a, b) {};
 
             var savedValue = fieldValue.get(fieldName, this.valuesCache);
             var currentValue = fieldValue.get(fieldName, data);

@@ -1,0 +1,26 @@
+.h {
+    display: none;
+}
+span.warning {
+    font-weight: bold;
+    color: #2C9397;
+}
+span.warning:before {
+    content: '*';
+}
+span.error {
+    font-weight: bold;
+    color: #EB6565;
+}
+span.error:before {
+    content: '*';
+}
+
+input[type="text"].error, input[type="password"].error, select.error, textarea.error {
+    background-color: #FF8B8B;
+    font-weight: bold;
+    color: white;
+}
+input[type="text"].warning, input[type="password"].warning, select.warning, textarea.warning {
+    background-color: #D0F0F3;
+}
