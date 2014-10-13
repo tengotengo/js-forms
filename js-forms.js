@@ -93,7 +93,7 @@ Forms = (function () {
                 return str;
             },
             checkbox: function (name, id, elements) {
-                var str = '<table cellpadding="0" cellspacing="0" class="radio-table">';
+                var str = '<table cellpadding="0" cellspacing="0" class="checkbox-table">';
 
                 for (var i = 0; i < elements.length; i++) {
                     str += '<tr>' +
@@ -561,6 +561,8 @@ Forms = (function () {
                     );
                     return
                 }
+                if (ref === void 0) return;
+
                 ref[name] = value;
                 return
             }
@@ -768,6 +770,10 @@ Forms = (function () {
         if (!fieldsList) return;
 
         for (var name in fieldsList) {
+            if (form.container[name] === void 0) {
+                warning('missing element', name)
+                continue;
+            }
             for (var paramName in fieldsList[name]) {
                 var attrArr = null;
 
@@ -799,8 +805,7 @@ Forms = (function () {
                                 for (var i = 0; i < attrArr.length; i++) {
                                     addClass(form.container[name], attrArr[i]);
                                 }
-                            } catch (e) {
-                            }
+                            } catch (e) {}
                         }
                         break;
                 }
@@ -950,6 +955,7 @@ Forms = (function () {
     }
 
     function findElementByNameAndType(parent, name, type) {
+        var result;
         if (parent.allChildren == undefined) {
             parent.allChildren = {};
 
@@ -960,12 +966,10 @@ Forms = (function () {
                 parent.allChildren[all[i].className].push(all[i]);
             }
         }
-        var result = parent.allChildren['form_' + type + '_' + name];
-
-        if (result === undefined) return null;
-
+        result = parent.allChildren['form_' + type + '_' + name];
+        if (!result) return null;
+        if (result && result.length === void 0) return result;
         if (result.length == 1) return result[0];
-
         return result[0] ? result : null;
     }
 
@@ -1003,47 +1007,6 @@ Forms = (function () {
                 default :
                     return '';
             }
-        }
-
-        function createElementByFieldType(type, name) {
-            name = name || !1;
-
-            var element = null,
-                tagName = getTagNameByType(type),
-                elemType = null;
-
-            switch (type) {
-                case 'text':
-                case 'hidden':
-                case 'password':
-                case 'checkbox':
-                case 'radio':
-                    elemType = type;
-                    break;
-            }
-
-            if (!tagName) return null;
-
-            try {
-                /* for IE */
-                element = document.createElement('<' + tagName + ' name="' + name + '" type="' + elemType + '">')
-            } catch (e) {
-                /* normal browser */
-                element = document.createElement(tagName.toUpperCase());
-            }
-
-            /* just in case */
-            if (elemType !== null) {
-                element.setAttribute('type', elemType);
-                element.type = elemType;
-            }
-            if (name !== !1) {
-                /* just in case */
-                element.setAttribute('name', name);
-                element.name = name;
-            }
-
-            return element;
         }
 
         var getLabelElement = function (text, forId) {
@@ -1112,32 +1075,26 @@ Forms = (function () {
                     var elementId = id + (isMultiple ? '-' + elementIndex : '');
                     var tmpElement, dataToPush = {};
 
-                    if (type == 'select') {
-                        if (i != 0) {
-                            tmpElement = createElementByFieldType('option');
-                            tmpElement.value = '';
-                            tmpElement.innerHTML = '';
-                            elementsData.push({input: elementToString(tmpElement)});
-                            i = 0;
-                        }
-
-                        tmpElement = createElementByFieldType('option');
-                        tmpElement.innerHTML = key;
-                    } else {
-                        tmpElement = createElementByFieldType(type, name);
-                        tmpElement.setAttribute('id', elementId);
-                        dataToPush['label'] = isLabel ? '' : elementToString(getLabelElement(key, elementId));
-                    }
                     var valueToSet = data[key] === null ? '' : data[key];
 
-                    if (type != 'textarea') {
-                        tmpElement.setAttribute('value', valueToSet);
-                        tmpElement.value = valueToSet;
+                    if (type == 'select') {
+                        if (i !== 0) {
+                            tmpElement = '<option value=""></option>';
+                            elementsData.push({input: tmpElement});
+                            i = 0;
+                        }
+                        tmpElement = '<option value="' + valueToSet + '">' + key + '</option>';
+                    } else {
+                        if (type == 'text' || type == 'hidden' || type == 'password' || type == 'checkbox' || type == 'radio') {
+                            tmpElement = '<input type="' + type + '" name="' + name + '" id="' + elementId + '" error-id="' + id + '" value="' + valueToSet + '" />';
+                        } else {
+                            tmpElement = '<textarea name="' + name + '" id="' + elementId + '" error-id="' + id + '" >' + valueToSet + '</textarea>';
+                        }
+                        dataToPush['label'] = isLabel ? '' : '<label for="' + elementId + '">' + key + '</label>';
                     }
 
-                    tmpElement.setAttribute('error-id', id);
+                    dataToPush['input'] = tmpElement;
 
-                    dataToPush['input'] = elementToString(tmpElement);
                     elementsData.push(dataToPush);
                     elementIndex++;
                 }
