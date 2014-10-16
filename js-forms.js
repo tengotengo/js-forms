@@ -46,6 +46,7 @@ Forms = (function () {
             return fBound;
         };
     }
+
     String.prototype.supplant = function (a, b) {
         return this.replace(/{([^{}]*)}/g, function (c, d) {
             return void 0 != a[d] ? a[d] : b ? '' : c
@@ -53,7 +54,6 @@ Forms = (function () {
     };
     var fieldUniqueCounter = 1;
     var formsList = {};
-    var tagsArr = ['input', 'textarea', 'select'];
     var defaults = {
         hideClass: 'h',
         classes: {
@@ -297,105 +297,120 @@ Forms = (function () {
             ]
         },
         hideError: function (warningObj) {
+            if (!warningObj) return;
             addClass(warningObj, defaults.hideClass);
         },
         showError: function (warningObj, text) {
+            if (!warningObj) return;
             warningObj.innerHTML = text;
             removeClass(warningObj, defaults.hideClass);
         },
-        field: function (form, fieldName, params, value) {
+        field: function (form, fieldName, params, value, errorClass, warningClass) {
             var fieldValid = !0;
             var valid = !0;
 
-            var config = form.getConfig();
-            var errorClass = config['errorClass'] || defaults.classes.error,
-                warningClass = config['warningClass'] || defaults.classes.warning;
-
-            if (params[DATA_TYPE_VALIDATE]) for (var type in params[DATA_TYPE_VALIDATE]) {
-                if (!validate.methods[type]) continue;
-
-                if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
-                    fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
-                        value,
-                        params[DATA_TYPE_VALIDATE][type]
-                    );
-                }
-
-                if (!fieldValid) {
-                    validate.showError(
-                        form.getErrorContainer(fieldName),
-                        validate.methods[type][VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
-                    );
-                    if (form.container[fieldName].name !== undefined) {
-                        addClass(form.container[fieldName], errorClass);
+            if (params[DATA_TYPE_VALIDATE]) {
+                for (var type in params[DATA_TYPE_VALIDATE]) {
+                    if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_VALIDATE], type)) {
+                        continue;
                     }
-                    valid = !1;
-                    break;
-                } else {
-                    if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
-                        validate.hideError(
-                            form.getErrorContainer(fieldName)
+
+                    if (validate.methods[type] == undefined) continue;
+
+                    if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
+                        fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
+                            value,
+                            params[DATA_TYPE_VALIDATE][type]
                         );
                     }
-                    if (form.container[fieldName].name !== undefined) {
-                        removeClass(form.container[fieldName], errorClass);
+
+                    if (!fieldValid) {
+                        validate.showError(
+                            form.getErrorContainer(fieldName),
+                            validate.methods[type][VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
+                        );
+                        if (form.container[fieldName].name !== undefined) {
+                            addClass(form.container[fieldName], errorClass);
+                        }
+                        valid = !1;
+                        break;
+                    } else {
+                        if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
+                            validate.hideError(
+                                form.getErrorContainer(fieldName)
+                            );
+                        }
+                        if (form.container[fieldName].name !== undefined) {
+                            removeClass(form.container[fieldName], errorClass);
+                        }
                     }
                 }
             }
 
-            if (params[DATA_TYPE_WARNING]) for (var type in params[DATA_TYPE_WARNING]) {
-                if (!validate.methods[type]) continue;
+            if (params[DATA_TYPE_WARNING]) {
+                for (var type in params[DATA_TYPE_WARNING]) {
+                    if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_WARNING], type)) {
+                        continue;
+                    }
 
-                if (!valid) {
-                    if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
-                        validate.hideError(
-                            form.getWarningContainer(fieldName)
+                    if (!validate.methods[type]) continue;
+
+                    if (!valid) {
+                        if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
+                            validate.hideError(
+                                form.getWarningContainer(fieldName)
+                            );
+                        }
+                        continue;
+                    }
+                    if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
+                        fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
+                            value,
+                            params[DATA_TYPE_WARNING][type]
                         );
                     }
-                    continue;
-                }
-                if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
-                    fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
-                        value,
-                        params[DATA_TYPE_WARNING][type]
-                    );
-                }
 
-                if (!fieldValid) {
-                    validate.showError(
-                        form.getWarningContainer(fieldName),
-                        validate.methods[type][VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
-                    );
-                    if (form.container[fieldName].name !== undefined) {
-                        addClass(form.container[fieldName], warningClass);
-                    }
-                    break;
-                } else {
-                    if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
-                        validate.hideError(
-                            form.getWarningContainer(fieldName)
+                    if (!fieldValid) {
+                        validate.showError(
+                            form.getWarningContainer(fieldName),
+                            validate.methods[type][VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
                         );
-                    }
-                    if (form.container[fieldName].name !== undefined) {
-                        removeClass(form.container[fieldName], warningClass);
+                        if (form.container[fieldName].name !== undefined) {
+                            addClass(form.container[fieldName], warningClass);
+                        }
+                        break;
+                    } else {
+                        if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
+                            validate.hideError(
+                                form.getWarningContainer(fieldName)
+                            );
+                        }
+                        if (form.container[fieldName].name !== undefined) {
+                            removeClass(form.container[fieldName], warningClass);
+                        }
                     }
                 }
             }
             return valid;
         },
         process: function (form, fields) {
-            var container = form.container;
-
-            var data = form.getFormData();
-            var valid = !0;
+            var data = form.getFormData(), valid = !0;
 
             for (var i in fields) {
-                if (container[i] === undefined) continue;
-                var name = container[i].name ? container[i].name : container[i][0].name;
-                if (validate.field(form, name, fields[i], data[i]) === !1) {
+                if (!Object.prototype.hasOwnProperty.call(fields, i)) {
+                    continue;
+                }
+
+                if (!fields[i][DATA_TYPE_VALIDATE] && !fields[i][DATA_TYPE_WARNING]) {
+                    continue;
+                }
+
+                if (!validate.field(form, i, fields[i], data[i], form.config['errorClass'] || defaults.classes.error,
+                    form.config['warningClass'] || defaults.classes.warning)) {
                     valid = !1;
                 }
             }
+
             return valid;
         }
     };
@@ -427,16 +442,16 @@ Forms = (function () {
             switch (tagName) {
                 case 'select':
                     var options = el.children, found = !1;
-                    for (var i = 0; i < options.length; i++) {
-                        if (val == options[i].value) {
-                            options[i].setAttribute('selected', '1');
-                            options[i].selected = !0;
+                    for (var i = 0, opts; opts = options[i]; i++) {
+                        if (val == opts.value) {
+                            opts.setAttribute('selected', '1');
+                            opts.selected = !0;
                             found = !0;
                             continue;
                         }
 
-                        options[i].removeAttribute('selected');
-                        options[i].selected = !1;
+                        opts.removeAttribute('selected');
+                        opts.selected = !1;
                     }
 
                     if (!found) {
@@ -486,13 +501,15 @@ Forms = (function () {
 
         /* in case if field name is xxx[] array */
         if (typeof value == 'object' && elem.length) {
-            for (var i = 0; i < elem.length; i++) {
-                setValue(elem[i], value !== null && value[i] ? value[i] : null);
+            for (var i = 0, el; el = elem[i]; i++) {
+                setValue(el, value !== null && value[i] ? value[i] : null);
             }
             return;
         }
         if (elem.length && !elem.tagName) {
-            for (var i = 0; i < elem.length; i++) setValue(elem[i], value);
+            for (var i = 0, el; el = elem[i]; i++) {
+                setValue(el, value);
+            }
             return;
         }
 
@@ -591,15 +608,13 @@ Forms = (function () {
     };
 
     function formToArray(form, emptyFields) {
-        var elements = form.elements;
         var result = {};
 
-        if (!elements) {
+        if (!form.length) {
             return result;
         }
 
-        for (var i = 0; i < elements.length; i++) {
-            var element = elements[i];
+        for (var i = 0, element; element = form[i]; i++) {
             var name = element.name;
 
             var getFieldValue = function (elem) {
@@ -658,7 +673,6 @@ Forms = (function () {
                 return !1
             };
 
-
             if (!name || element.disabled || hasClass(element, 'default-text')) {
                 continue;
             }
@@ -690,24 +704,6 @@ Forms = (function () {
         return result;
     }
 
-    function setValues(form, data) {
-        if (!data) return;
-
-        var fired = {};
-        elementsProcess.call(form, function (elem) {
-            var elName = elem.name;
-            var value = fieldValue.get(elName, data);
-
-            if (value === undefined) return;
-
-            setFieldValue(form.container[elName], value);
-
-            if (fired[elem.name]) return;
-
-            fired[elem.name] = 1;
-        });
-    }
-
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
         obj.setAttribute('class', 'form_' + type + '_' + name);
@@ -723,19 +719,6 @@ Forms = (function () {
         addClass(span, defaults.hideClass);
 
         return span;
-    }
-
-    function setDefaultValues(form, fieldsList) {
-        if (!fieldsList) return;
-        for (var name in fieldsList) {
-            if (!form.container[name]) {
-                warning('field wasn\'t added', name);
-            }
-            if (fieldsList[name]['defaultVal'] === undefined) {
-                continue
-            }
-            setFieldValue(form.container[name], fieldsList[name]['defaultVal']);
-        }
     }
 
     function bind(obj, evt, fnc) {
@@ -766,57 +749,8 @@ Forms = (function () {
         }
     }
 
-    function setAtributes(form, fieldsList) {
-        if (!fieldsList) return;
-
-        for (var name in fieldsList) {
-            if (form.container[name] === void 0) {
-                warning('missing element', name)
-                continue;
-            }
-            for (var paramName in fieldsList[name]) {
-                var attrArr = null;
-
-                switch (paramName) {
-                    case DATA_TYPE_DISABLED:
-                    case DATA_TYPE_BITMASK:
-                        if (!form.container[name]) break;
-                        if (form.container[name].length) {
-                            for (var i = 0; i < form.container[name].length; i++) {
-                                form.container[name][i].setAttribute(paramName, '1');
-                            }
-                        } else {
-                            form.container[name].setAttribute(paramName, '1');
-                        }
-                        break;
-                    case DATA_TYPE_ATTRIBUTES:
-                        attrArr = fieldsList[name][paramName];
-                        for (var attr in attrArr) {
-                            form.container[name].setAttribute(attr, attrArr[attr])
-                        }
-                        break;
-                    case DATA_TYPE_CLASS:
-                        attrArr = fieldsList[name][paramName];
-
-                        if (typeof attrArr == 'string') {
-                            addClass(form.container[name], attrArr);
-                        } else {
-                            try {
-                                for (var i = 0; i < attrArr.length; i++) {
-                                    addClass(form.container[name], attrArr[i]);
-                                }
-                            } catch (e) {}
-                        }
-                        break;
-                }
-            }
-        }
-    }
-
     function bindFormEvents(form) {
-        var conf = form.getConfig();
-
-        if (!(conf[PARAM_FLAGS] & FLAG_ASYNC)) {
+        if (!(form.config[PARAM_FLAGS] & FLAG_ASYNC)) {
             form.submit = function () {
                 form.container.submit.call(form.container);
             };
@@ -824,11 +758,11 @@ Forms = (function () {
         }
 
         var submit = function (callback) {
-            var submitCallback = conf[PARAM_SUBMIT_CALLBACK] || defaults.submitCallback,
-                validateCallback = conf[PARAM_ON_VALIDATE] || defaults.validateCallback,
-                beforeSubmit = conf[PARAM_BEFORE_SUBMIT] || defaults.beforeSubmitCallback,
-                afterSubmit = conf[PARAM_AFTER_SUBMIT] || defaults.afterSubmitCallback,
-                onSubmit = conf[PARAM_ON_SUBMIT] || function (callback) {
+            var submitCallback = form.config[PARAM_SUBMIT_CALLBACK] || defaults.submitCallback,
+                validateCallback = form.config[PARAM_ON_VALIDATE] || defaults.validateCallback,
+                beforeSubmit = form.config[PARAM_BEFORE_SUBMIT] || defaults.beforeSubmitCallback,
+                afterSubmit = form.config[PARAM_AFTER_SUBMIT] || defaults.afterSubmitCallback,
+                onSubmit = form.config[PARAM_ON_SUBMIT] || function (callback) {
                     callback = callback || function () {
                     };
 
@@ -838,15 +772,15 @@ Forms = (function () {
                     if (isValid) {
                         var data = form.getFormData();
 
-                        if (conf[PARAM_PARAMS]) {
-                            for (var i in conf[PARAM_PARAMS]) {
-                                data[i] = conf[PARAM_PARAMS][i];
+                        if (form.config[PARAM_PARAMS]) {
+                            for (var i in form.config[PARAM_PARAMS]) {
+                                data[i] = form.config[PARAM_PARAMS][i];
                             }
                         }
 
                         defaults.ajax(form.action, "POST", data, (function (cb) {
                             return function (status, data) {
-                                submitCallback(status, data, cb);
+                                submitCallback.call(form, status, data, cb);
                             }
                         })(callback));
 
@@ -893,83 +827,46 @@ Forms = (function () {
         }
     }
 
-    function bindInputEvents(validationType) {
-        var onChange = function (e, fieldName, type) {
-            switch (type) {
-                case Forms.VALIDATION_ON_CHANGE:
-                    if (e.type == 'blur') {
-                        this.validate(fieldName)
-                    }
-                    break;
-                case Forms.VALIDATION_ON_KEYUP:
-                    this.validate(fieldName);
-                    break;
-            }
-            var data = this.getFormData();
-            var onChangeCallback = this.getConfig()[PARAM_ON_CHANGE] || defaults.onChange;
-            var onFieldChange = this.getConfig()[PARAM_ON_FIELD_CHANGE] || function (a, b) {};
-
-            var savedValue = fieldValue.get(fieldName, this.valuesCache);
-            var currentValue = fieldValue.get(fieldName, data);
-
-            var isDifferent = differs(this.defaultFormData, data);
-
-            if (this.isChanged != isDifferent) {
-                onChangeCallback(isDifferent, this);
-            }
-            this.isChanged = isDifferent;
-
-            if (differs(savedValue, currentValue)) {
-                onFieldChange(fieldName, currentValue);
-                fieldValue.set(fieldName, currentValue, this.valuesCache);
-            }
-        };
-
-        elementsProcess.call(this, function (elem) {
-            if (elem.initialized) {
-                return;
-            }
-            var eventFunc = function (n) {
-                return function (e) {
-                    onChange.call(this, e, n, validationType)
-                }.bind(this)
-            }.call(this, elem.name);
-
-            bind(elem, 'blur', eventFunc);
-            bind(elem, 'click', eventFunc);
-            bind(elem, 'keyup', eventFunc);
-            bind(elem, 'formChange', eventFunc);
-
-            elem.initialized = !0;
-        }.bind(this));
-    }
-
     function elementsProcess(callback) {
-        for (var i = 0; i < tagsArr.length; i++) {
-            var elements = this.container.getElementsByTagName(tagsArr[i]);
+        var setElements = !this.elements;
+        if (setElements) {
+            this.elements = {};
+        }
 
-            for (var elIndex = 0; elIndex < elements.length; elIndex++) {
-                callback(elements[elIndex]);
+        for (var i = 0, elem; elem = this.container[i]; i++) {
+            if (setElements) {
+                if (this.elements[elem.name]) {
+                    if (Object.prototype.toString.call(this.elements[elem.name]) === "[object Array]") {
+                        this.elements[elem.name].push(elem);
+                    } else {
+                        this.elements[elem.name] = Array.prototype.concat(this.elements[elem.name], elem);
+                    }
+                } else {
+                    this.elements[elem.name] = elem;
+                }
             }
+            callback(elem);
         }
     }
 
     function findElementByNameAndType(parent, name, type) {
         var result;
-        if (parent.allChildren == undefined) {
+        if (!parent.allChildren) {
             parent.allChildren = {};
 
             var all = parent.getElementsByTagName('*');
 
-            for (var i = 0; i < all.length; i++) {
-                parent.allChildren[all[i].className] = parent.allChildren[all[i].className] || [];
-                parent.allChildren[all[i].className].push(all[i]);
+            for (var i = 0, elem; elem = all[i]; i++) {
+                parent.allChildren[elem.className] = parent.allChildren[elem.className] || [];
+                parent.allChildren[elem.className].push(elem);
             }
         }
         result = parent.allChildren['form_' + type + '_' + name];
+
         if (!result) return null;
         if (result && result.length === void 0) return result;
         if (result.length == 1) return result[0];
+
         return result[0] ? result : null;
     }
 
@@ -1113,11 +1010,13 @@ Forms = (function () {
         if (container[name] === void 0) {
             var errorContainer = findElementByNameAndType(this.container, name, type);
             if (!errorContainer) {
+                if (!this.fieldContainers[name]) return;
+
                 errorContainer = createMsgContainer(name, type, this.fieldContainers[name].tagName);
                 this.fieldContainers[name].parentNode.insertBefore(errorContainer, this.fieldContainers[name].nextSibling);
             }
             if (!errorContainer.children.length) {
-                errorContainer.appendChild(createTextContainer(this.getConfig()[type + 'Class'] || defaults.classes[type]));
+                errorContainer.appendChild(createTextContainer(this.config[type + 'Class'] || defaults.classes[type]));
             }
 
             container[name] = errorContainer;
@@ -1146,14 +1045,10 @@ Forms = (function () {
                 cache: null,
                 config: conf || null,
                 initialized: !1,
-                defaultFormData: null,
+                valuesCache: null,
                 container: null
             };
             var form = this;
-
-            function getConfig() {
-                return opt.config
-            }
 
             function processConfig(c) {
                 /* TODO check if incoming object is valid */
@@ -1178,7 +1073,7 @@ Forms = (function () {
 
             form.isChanged = !1;
 
-            form.getConfig = getConfig;
+            form.config = opt.config;
 
             if (!processConfig(opt.config)) {
                 warning(MSG_NO_CONFIG);
@@ -1192,12 +1087,19 @@ Forms = (function () {
             }
             if (opt.config[PARAM_OBJ]) {
                 form.container = opt.container = opt.config[PARAM_OBJ];
-                opt.config[PARAM_ID] = form.container.id;
+                opt.config[PARAM_ID] = form.container.getAttribute('id');
             }
 
-            form.getFormData = function (emptyFields) {
-                emptyFields = emptyFields || !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
-                return formToArray(form.container, emptyFields)
+            if (!form.container) return;
+
+            var getFormDataCache = null;
+            var emptyFields = !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
+            form.getFormData = function (renewCache) {
+                if (getFormDataCache && !form.isChanged && !renewCache) {
+                    return getFormDataCache;
+                }
+                getFormDataCache = formToArray(form.container, emptyFields);
+                return getFormDataCache;
             };
 
             if (opt.config[PARAM_ACTION]) {
@@ -1205,20 +1107,28 @@ Forms = (function () {
             }
             form.ignoreList = {};
 
-
             form.action = opt.container.getAttribute('action');
 
             form.setField = function (name, value) {
-                setFieldValue(opt.container[name], value);
-                fireEvent(opt.container[name], 'formChange');
+                if (!form.elements[name]) return;
+                setFieldValue(form.elements[name], value);
+                fireEvent(form.elements[name], 'formChange');
             };
             form.getField = function (name) {
                 return form.container[name];
             };
             form.validate = function (fieldName) {
                 if (fieldName) {
-                    var data = form.getFormData();
-                    return validate.field(form, fieldName, opt.config[PARAM_FIELDS][fieldName], data[fieldName])
+                    var data = form.getFormData(true);
+
+                    return validate.field(
+                        form,
+                        fieldName,
+                        opt.config[PARAM_FIELDS][fieldName],
+                        data[fieldName],
+                        form.config['errorClass'] || defaults.classes.error,
+                        form.config['warningClass'] || defaults.classes.warning
+                    )
                 } else {
                     return validate.process(form, opt.config[PARAM_FIELDS])
                 }
@@ -1237,32 +1147,140 @@ Forms = (function () {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name)
             };
 
+            var differsObj = {};
+
             form.initInputs = function () {
                 /* go through all fields in the form. IE7 ".hasAttribute" fix */
+                var index = 0;
+
+                var fieldsList = opt.config[PARAM_FIELDS];
+                var data = opt.config[PARAM_DATA];
+                var validationType = opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT;
+
+                var formChangedLastStatus = false;
+                var onChange = function (e, fieldName, type) {
+                    switch (type) {
+                        case Forms.VALIDATION_ON_CHANGE:
+                            if (e.type == 'blur') {
+                                this.validate(fieldName)
+                            }
+                            break;
+                        case Forms.VALIDATION_ON_KEYUP:
+                            this.validate(fieldName);
+                            break;
+                    }
+//                    var data = this.getFormData(true);
+                    var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
+                    var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) {};
+
+                    var savedValue = fieldValue.get(fieldName, this.valuesCache);
+                    var currentValue = fieldValue.get(fieldName, this.getFieldValue(fieldName));
+
+                    var isDifferent = differs(savedValue, currentValue);
+
+                    if (isDifferent) {
+                        differsObj[fieldName] = 1;
+                    } else {
+                        delete differsObj[fieldName];
+                    }
+
+                    this.isChanged = JSON.stringify(differsObj) !== '{}';
+
+                    if (this.isChanged != formChangedLastStatus) {
+                        onChangeCallback(this.isChanged, this);
+                        formChangedLastStatus = !!this.isChanged;
+                    }
+
+                    if (isDifferent) {
+                        onFieldChange(fieldName, currentValue);
+                    }
+                };
+
                 elementsProcess.call(form, function (elem) {
                     if (elem.hasAttribute === undefined) {
                         elem.hasAttribute = function (attrName) {
                             return typeof this[attrName] !== 'undefined';
                         }
                     }
-                });
+                    var name = elem.name;
 
-                var index = 0;
-                for (var i = 0; i < form.container.elements.length; i++) {
-                    var elem = form.container.elements[i];
+                    if (data) {
+                        var value = fieldValue.get(name, data);
+                        if (value !== undefined) {
+                            setFieldValue(elem, value);
+                        }
+                    }
+                    if (fieldsList[name]) {
+                        /* setting default values */
+                        if (fieldsList[name]['defaultVal'] !== undefined) {
+                            setFieldValue(elem, fieldsList[name]['defaultVal']);
+                        }
+
+                        /* insert classes and other attributes, validation */
+                        for (var paramName in fieldsList[name]) {
+                            var attrArr = null;
+
+                            switch (paramName) {
+                                case DATA_TYPE_DISABLED:
+                                case DATA_TYPE_BITMASK:
+                                    if (elem.length) {
+                                        for (var i = 0, subElem; subElem = elem[i]; i++) {
+                                            subElem.setAttribute(paramName, '1');
+                                        }
+                                    } else {
+                                        elem.setAttribute(paramName, '1');
+                                    }
+                                    break;
+                                case DATA_TYPE_ATTRIBUTES:
+                                    attrArr = fieldsList[name][paramName];
+                                    for (var attr in attrArr) {
+                                        elem.setAttribute(attr, attrArr[attr])
+                                    }
+                                    break;
+                                case DATA_TYPE_CLASS:
+                                    attrArr = fieldsList[name][paramName];
+
+                                    if (typeof attrArr == 'string') {
+                                        addClass(elem, attrArr);
+                                    } else {
+                                        try {
+                                            for (var i = 0; i < attrArr.length; i++) {
+                                                addClass(elem, attrArr[i]);
+                                            }
+                                        } catch (e) {}
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+
+                    /* bind change events */
+                    if (!elem.initialized) {
+                        var eventFunc = function (n) {
+                            return function (e) {
+                                onChange.call(this, e, n, validationType)
+                            }.bind(this)
+                        }.call(form, elem.name);
+
+                        bind(elem, 'blur', eventFunc);
+                        bind(elem, 'click', eventFunc);
+                        bind(elem, 'keyup', eventFunc);
+                        bind(elem, 'formChange', eventFunc);
+
+                        elem.initialized = !0;
+                    }
 
                     if (elem.type && (elem.type == 'hidden' || elem.type == 'disabled')) {
-                        continue;
+                        return;
                     }
-                    elem.setAttribute('tabindex', ++index);
-                }
 
-                /* bind change events */
-                bindInputEvents.call(form, opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT);
+                    elem.setAttribute('tabindex', ++index);
+                });
             };
             form.saveChanges = function () {
                 /* stores saved changes */
-                form.defaultFormData = form.getFormData();
+                differsObj = {};
+                form.valuesCache = form.getFormData();
                 (opt.config[PARAM_ON_CHANGE] || defaults.onChange)(!1, form);
                 form.isChanged = !1;
             };
@@ -1278,23 +1296,17 @@ Forms = (function () {
 
             form.initInputs();
 
-            /* insert default values */
-            setDefaultValues(form, opt.config[PARAM_FIELDS]);
-
-            /* insert classes and other attributes, validation */
-            setAtributes(form, opt.config[PARAM_FIELDS]);
-
-            /* insert values from data object */
-            if (opt.config[PARAM_DATA]) {
-                setValues(form, opt.config[PARAM_DATA]);
-            }
-
             /* stores current changes */
             form.valuesCache = form.getFormData();
 
             bindFormEvents(form);
 
             form.saveChanges();
+
+            form.getFieldValue = function(name) {
+                if (!form.elements[name]) return;
+                return formToArray(Array.prototype.concat(form.elements[name]), emptyFields);
+            };
 
             if (opt.config[PARAM_VALIDATION_TYPE] === VALIDATION_ON_KEYUP) {
                 form.validate();
