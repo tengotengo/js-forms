@@ -329,10 +329,11 @@ Forms = (function () {
                             form.getErrorContainer(fieldName),
                             validate.methods[type][VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
                         );
-                        if (form.container[fieldName].name !== undefined) {
-                            addClass(form.container[fieldName], errorClass);
+                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                            addClass(form.elements[fieldName], errorClass);
                         }
                         valid = !1;
+                        console.log(fieldName, 'is not valid');
                         break;
                     } else {
                         if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
@@ -340,8 +341,8 @@ Forms = (function () {
                                 form.getErrorContainer(fieldName)
                             );
                         }
-                        if (form.container[fieldName].name !== undefined) {
-                            removeClass(form.container[fieldName], errorClass);
+                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                            removeClass(form.elements[fieldName], errorClass);
                         }
                     }
                 }
@@ -375,8 +376,8 @@ Forms = (function () {
                             form.getWarningContainer(fieldName),
                             validate.methods[type][VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
                         );
-                        if (form.container[fieldName].name !== undefined) {
-                            addClass(form.container[fieldName], warningClass);
+                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                            addClass(form.elements[fieldName], warningClass);
                         }
                         break;
                     } else {
@@ -385,8 +386,8 @@ Forms = (function () {
                                 form.getWarningContainer(fieldName)
                             );
                         }
-                        if (form.container[fieldName].name !== undefined) {
-                            removeClass(form.container[fieldName], warningClass);
+                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                            removeClass(form.elements[fieldName], warningClass);
                         }
                     }
                 }
@@ -394,7 +395,7 @@ Forms = (function () {
             return valid;
         },
         process: function (form, fields) {
-            var data = form.getFormData(), valid = !0;
+            var data = form.getFormData(1), valid = !0;
 
             for (var i in fields) {
                 if (!Object.prototype.hasOwnProperty.call(fields, i)) {
@@ -406,7 +407,7 @@ Forms = (function () {
                 }
 
                 if (!validate.field(form, i, fields[i], data[i], form.config['errorClass'] || defaults.classes.error,
-                    form.config['warningClass'] || defaults.classes.warning)) {
+                                    form.config['warningClass'] || defaults.classes.warning)) {
                     valid = !1;
                 }
             }
@@ -607,6 +608,7 @@ Forms = (function () {
         }
     };
 
+
     function formToArray(form, emptyFields) {
         var result = {};
 
@@ -751,20 +753,23 @@ Forms = (function () {
 
     function bindFormEvents(form) {
         if (!(form.config[PARAM_FLAGS] & FLAG_ASYNC)) {
-            form.submit = function () {
-                form.container.submit.call(form.container);
+            /* if not async */
+            form.submit = function (callback) {
+                form.container.submit(callback);
             };
             return;
         }
 
-        var submit = function (callback) {
+        var submit = function () {
+            var lastOne = arguments[arguments.length - 1];
+            var callback = typeof lastOne == 'function' ? lastOne : function() {};
+
             var submitCallback = form.config[PARAM_SUBMIT_CALLBACK] || defaults.submitCallback,
                 validateCallback = form.config[PARAM_ON_VALIDATE] || defaults.validateCallback,
                 beforeSubmit = form.config[PARAM_BEFORE_SUBMIT] || defaults.beforeSubmitCallback,
                 afterSubmit = form.config[PARAM_AFTER_SUBMIT] || defaults.afterSubmitCallback,
-                onSubmit = form.config[PARAM_ON_SUBMIT] || function (callback) {
-                    callback = callback || function () {
-                    };
+                onSubmit = form.config[PARAM_ON_SUBMIT] || function (cb) {
+                    cb = cb || function() {};
 
                     var isValid = form.validate();
                     validateCallback(isValid);
@@ -782,7 +787,7 @@ Forms = (function () {
                             return function (status, data) {
                                 submitCallback.call(form, status, data, cb);
                             }
-                        })(callback));
+                        })(cb));
 
                         form.saveChanges();
 
@@ -1045,7 +1050,6 @@ Forms = (function () {
                 cache: null,
                 config: conf || null,
                 initialized: !1,
-                valuesCache: null,
                 container: null
             };
             var form = this;
@@ -1092,20 +1096,22 @@ Forms = (function () {
 
             if (!form.container) return;
 
-            var getFormDataCache = null;
+            var formDataCache = null;
             var emptyFields = !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
             form.getFormData = function (renewCache) {
-                if (getFormDataCache && !form.isChanged && !renewCache) {
-                    return getFormDataCache;
+                if (formDataCache && !form.isChanged && !renewCache) {
+                    return cloneObject(formDataCache);
                 }
-                getFormDataCache = formToArray(form.container, emptyFields);
-                return getFormDataCache;
+                formDataCache = formToArray(form.container, emptyFields);
+                return formDataCache;
             };
 
             if (opt.config[PARAM_ACTION]) {
                 opt.container.setAttribute(PARAM_ACTION, opt.config[PARAM_ACTION])
             }
-            form.ignoreList = {};
+            form.differsObj = {};
+            form.prevValues = {};
+            form.valuesCache = {};
 
             form.action = opt.container.getAttribute('action');
 
@@ -1115,7 +1121,7 @@ Forms = (function () {
                 fireEvent(form.elements[name], 'formChange');
             };
             form.getField = function (name) {
-                return form.container[name];
+                return form.elements[name];
             };
             form.validate = function (fieldName) {
                 if (fieldName) {
@@ -1147,17 +1153,16 @@ Forms = (function () {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name)
             };
 
-            var differsObj = {};
-
             form.initInputs = function () {
-                /* go through all fields in the form. IE7 ".hasAttribute" fix */
                 var index = 0;
 
                 var fieldsList = opt.config[PARAM_FIELDS];
                 var data = opt.config[PARAM_DATA];
                 var validationType = opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT;
-
+                var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
+                var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) { console.log('fieldChange fired', arguments )};
                 var formChangedLastStatus = false;
+
                 var onChange = function (e, fieldName, type) {
                     switch (type) {
                         case Forms.VALIDATION_ON_CHANGE:
@@ -1169,30 +1174,20 @@ Forms = (function () {
                             this.validate(fieldName);
                             break;
                     }
-//                    var data = this.getFormData(true);
-                    var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
-                    var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) {};
-
                     var savedValue = fieldValue.get(fieldName, this.valuesCache);
                     var currentValue = fieldValue.get(fieldName, this.getFieldValue(fieldName));
+                    var prevValue = fieldValue.get(fieldName, this.prevValues);
 
-                    var isDifferent = differs(savedValue, currentValue);
-
-                    if (isDifferent) {
-                        differsObj[fieldName] = 1;
-                    } else {
-                        delete differsObj[fieldName];
-                    }
-
-                    this.isChanged = JSON.stringify(differsObj) !== '{}';
+                    this.isChanged = differs(savedValue, currentValue);
 
                     if (this.isChanged != formChangedLastStatus) {
                         onChangeCallback(this.isChanged, this);
                         formChangedLastStatus = !!this.isChanged;
                     }
 
-                    if (isDifferent) {
+                    if (differs(prevValue, currentValue)) {
                         onFieldChange(fieldName, currentValue);
+                        fieldValue.set(fieldName, currentValue, this.prevValues);
                     }
                 };
 
@@ -1202,18 +1197,23 @@ Forms = (function () {
                             return typeof this[attrName] !== 'undefined';
                         }
                     }
-                    var name = elem.name;
-
-                    if (data) {
-                        var value = fieldValue.get(name, data);
-                        if (value !== undefined) {
-                            setFieldValue(elem, value);
+                    (function() {
+                        if (elem.type && (elem.type == 'hidden' || elem.type == 'disabled')) {
+                            return;
                         }
-                    }
+
+                        elem.setAttribute('tabindex', ++index);
+                        elem.formIndex = elem.formIndex || index;
+                    })();
+
+                    var name = elem.name;
+                    var value = fieldValue.get(name, data);
+
                     if (fieldsList[name]) {
                         /* setting default values */
-                        if (fieldsList[name]['defaultVal'] !== undefined) {
+                        if (fieldsList[name]['defaultVal'] !== undefined && value === undefined) {
                             setFieldValue(elem, fieldsList[name]['defaultVal']);
+                            fieldValue.set(name, fieldsList[name]['defaultVal'], form.prevValues);
                         }
 
                         /* insert classes and other attributes, validation */
@@ -1253,6 +1253,10 @@ Forms = (function () {
                             }
                         }
                     }
+                    if (value !== undefined && value !== null) {
+                        setFieldValue(elem, value);
+                        fieldValue.set(name, value, form.prevValues);
+                    }
 
                     /* bind change events */
                     if (!elem.initialized) {
@@ -1269,17 +1273,12 @@ Forms = (function () {
 
                         elem.initialized = !0;
                     }
-
-                    if (elem.type && (elem.type == 'hidden' || elem.type == 'disabled')) {
-                        return;
-                    }
-
-                    elem.setAttribute('tabindex', ++index);
                 });
             };
             form.saveChanges = function () {
                 /* stores saved changes */
-                differsObj = {};
+                form.differsObj = {};
+                form.prevValues = form.getFormData();
                 form.valuesCache = form.getFormData();
                 (opt.config[PARAM_ON_CHANGE] || defaults.onChange)(!1, form);
                 form.isChanged = !1;
@@ -1293,20 +1292,19 @@ Forms = (function () {
                 !!(opt.config[PARAM_FLAGS] & FLAG_DEBUG),
                 opt.config[PARAM_TEMPLATES]
             );
-
-            form.initInputs();
-
-            /* stores current changes */
-            form.valuesCache = form.getFormData();
-
-            bindFormEvents(form);
-
-            form.saveChanges();
-
             form.getFieldValue = function(name) {
                 if (!form.elements[name]) return;
                 return formToArray(Array.prototype.concat(form.elements[name]), emptyFields);
             };
+
+            form.initInputs();
+
+            /* stores current changes */
+//            form.valuesCache = form.getFormData();
+
+            bindFormEvents(form);
+
+            form.saveChanges();
 
             if (opt.config[PARAM_VALIDATION_TYPE] === VALIDATION_ON_KEYUP) {
                 form.validate();
