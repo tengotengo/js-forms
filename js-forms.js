@@ -130,9 +130,9 @@ Forms = (function () {
                 }
             };
         },
-        onChange: function (a, b) {
-
-        },
+        onChange: function (a, b) {},
+        formContext: function (a) {},
+        fieldContext: function (a) {},
         submitCallback: function (a, b, c) {
             c();
             return !0;
@@ -162,12 +162,16 @@ Forms = (function () {
         PARAM_BEFORE_SUBMIT = 'beforeSubmit',
         PARAM_SUBMIT_CALLBACK = 'submitCallback',
         PARAM_ERROR_CALLBACK = 'errorCallback',
+        PARAM_FIELD_CONTEXT = 'fieldContext',
+        PARAM_FORM_CONTEXT = 'formContext',
         PARAM_AFTER_SUBMIT = 'afterSubmit',
         PARAM_FIELDS = 'fields',
         PARAM_VALIDATION_TYPE = 'validationType',
         PARAM_ON_FIELD_CHANGE = 'onFieldChange',
         PARAM_ON_CHANGE = 'onChange',
+        PARAM_ON_INIT = 'onInit',
         PARAM_ON_VALIDATE = 'onValidate',
+        PARAM_VALIDATE = 'validate',
         PARAM_DATA = 'data',
         PARAM_TEMPLATES = 'templates',
         PARAM_PARAMS = 'params',
@@ -418,7 +422,7 @@ Forms = (function () {
 
     function differs(a, b) {
         if (typeof a == typeof b && ("string" == typeof b || "number" == typeof b))return a != b;
-        if ("object" == typeof a && "object" == typeof b) {
+        if ("object" == typeof a && "object" == typeof b && a !== null && b !== null) {
             var c;
             for (c in a)if (differs(a[c], b[c]))return!0;
             for (c in b)if (differs(a[c], b[c]))return!0
@@ -534,6 +538,17 @@ Forms = (function () {
     var fieldValue = {
         allReg : /\[([a-zA-Z0-9-]*)\]/g,
         isObjReg : /\[(.*)\]/g,
+        getPath: function(fieldName) {
+            var freeVar = fieldName.replace(fieldValue.isObjReg, '');
+            var arr = [];
+            if (freeVar) arr.push(freeVar);
+
+            var match;
+            while (match = fieldValue.allReg.exec(fieldName)) {
+                arr.push(match[1]);
+            }
+            return arr;
+        },
         serialize: function (a, b) {
             var c = [];
             for (var d in a) {
@@ -542,25 +557,30 @@ Forms = (function () {
             }
             return c.join("&")
         },
-        get : function(fieldName, reference) {
-            var arr = [fieldName.replace(fieldValue.isObjReg, '')];
-            var match;
-            while (match = fieldValue.allReg.exec(fieldName)) {
-                arr.push(match[1]);
-            }
+        getOrDel: function(fieldName, reference, del) {
+            var arr = this.getPath(fieldName);
 
             if (reference === undefined || reference[arr[0]] === undefined) return undefined;
 
-            var tmpObj = reference;
+            var tmpObj = reference, lastTmpObj, lastInd;
 
             for (var i = 0; i < arr.length; i++) {
                 if (tmpObj[arr[i]] !== undefined) {
-                    if (tmpObj[arr[i]] == '') return tmpObj[arr[i]];
+                    if (tmpObj[arr[i]] == '') {
+                        return del ? delete tmpObj[arr[i]] : tmpObj[arr[i]];
+                    }
+                    lastTmpObj = tmpObj;
+                    lastInd = arr[i];
                     tmpObj = tmpObj[arr[i]]
                 }
             }
-
-            return tmpObj;
+            return del ? delete lastTmpObj[lastInd] : tmpObj;
+        },
+        del: function(fieldName, reference) {
+            return this.getOrDel(fieldName, reference, !0);
+        },
+        get : function(fieldName, reference) {
+            return this.getOrDel(fieldName, reference);
         },
         setVal : function(namesArr, value, ref) {
             if (!namesArr.length) {
@@ -596,18 +616,11 @@ Forms = (function () {
             fieldValue.setVal(namesArr, value, tmpObj)
         },
         set : function(fieldName, value, reference) {
-            var freeVar = fieldName.replace(fieldValue.isObjReg, '');
-            var arr = [];
-            if (freeVar) arr.push(freeVar);
+            var arr = this.getPath(fieldName);
 
-            var match;
-            while (match = fieldValue.allReg.exec(fieldName)) {
-                arr.push(match[1]);
-            }
             fieldValue.setVal(arr, value, reference);
         }
     };
-
 
     function formToArray(form, emptyFields) {
         var result = {};
@@ -772,6 +785,7 @@ Forms = (function () {
                     cb = cb || function() {};
 
                     var isValid = form.validate();
+
                     validateCallback(isValid);
 
                     if (isValid) {
@@ -1130,14 +1144,15 @@ Forms = (function () {
                     return validate.field(
                         form,
                         fieldName,
-                        opt.config[PARAM_FIELDS][fieldName],
+                        form.config[PARAM_FIELDS][fieldName],
                         data[fieldName],
                         form.config['errorClass'] || defaults.classes.error,
                         form.config['warningClass'] || defaults.classes.warning
                     )
-                } else {
-                    return validate.process(form, opt.config[PARAM_FIELDS])
                 }
+                return form.config[PARAM_VALIDATE] ?
+                    form.config[PARAM_VALIDATE](form, form.getFormData(1)) :
+                    validate.process(form, opt.config[PARAM_FIELDS]);
             };
             form.clear = clear.bind(form);
 
@@ -1153,15 +1168,16 @@ Forms = (function () {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name)
             };
 
+            form.lastChangedStatus = false;
+
             form.initInputs = function () {
                 var index = 0;
 
-                var fieldsList = opt.config[PARAM_FIELDS];
+                var fieldsList = opt.config[PARAM_FIELDS] || {};
                 var data = opt.config[PARAM_DATA];
                 var validationType = opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT;
                 var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
                 var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) { console.log('fieldChange fired', arguments )};
-                var formChangedLastStatus = false;
 
                 var onChange = function (e, fieldName, type) {
                     switch (type) {
@@ -1178,11 +1194,18 @@ Forms = (function () {
                     var currentValue = fieldValue.get(fieldName, this.getFieldValue(fieldName));
                     var prevValue = fieldValue.get(fieldName, this.prevValues);
 
-                    this.isChanged = differs(savedValue, currentValue);
+                    if (differs(savedValue, currentValue)) {
+                        fieldValue.set(fieldName, !0, this.differsObj);
+                    } else {
+                        fieldValue.del(fieldName, this.differsObj);
+                    }
 
-                    if (this.isChanged != formChangedLastStatus) {
+                    this.isChanged = differs(this.differsObj, {});
+
+                    if (this.isChanged != this.lastChangedStatus) {
+
                         onChangeCallback(this.isChanged, this);
-                        formChangedLastStatus = !!this.isChanged;
+                        this.lastChangedStatus = !!this.isChanged;
                     }
 
                     if (differs(prevValue, currentValue)) {
@@ -1278,6 +1301,7 @@ Forms = (function () {
             form.saveChanges = function () {
                 /* stores saved changes */
                 form.differsObj = {};
+                form.lastChangedStatus = false;
                 form.prevValues = form.getFormData();
                 form.valuesCache = form.getFormData();
                 (opt.config[PARAM_ON_CHANGE] || defaults.onChange)(!1, form);
@@ -1298,6 +1322,10 @@ Forms = (function () {
             };
 
             form.initInputs();
+
+            if (opt.config[PARAM_ON_INIT]) {
+                opt.config[PARAM_ON_INIT](form);
+            }
 
             /* stores current changes */
 //            form.valuesCache = form.getFormData();
