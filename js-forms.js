@@ -21,134 +21,8 @@
  * THE SOFTWARE.
  */
 
-Forms = (function () {
-    if (!Function.prototype.bind) {
-        Function.prototype.bind = function(oThis) {
-            if (typeof this !== 'function') {
-                // closest thing possible to the ECMAScript 5
-                // internal IsCallable function
-                throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
-            }
-
-            var aArgs = Array.prototype.slice.call(arguments, 1),
-                fToBind = this,
-                fNOP = function() {},
-                fBound = function() {
-                    return fToBind.apply(this instanceof fNOP && oThis
-                        ? this
-                        : oThis,
-                        aArgs.concat(Array.prototype.slice.call(arguments)));
-                };
-
-            fNOP.prototype = this.prototype;
-            fBound.prototype = new fNOP();
-
-            return fBound;
-        };
-    }
-
-    String.prototype.supplant = function (a, b) {
-        return this.replace(/{([^{}]*)}/g, function (c, d) {
-            return void 0 != a[d] ? a[d] : b ? '' : c
-        })
-    };
-    var fieldUniqueCounter = 1;
-    var formsList = {};
-    var defaults = {
-        hideClass: 'h',
-        classes: {
-            error: 'error',
-            warning: 'warning'
-        },
-        errorClass: 'error',
-        warningClass: 'warning',
-        templateFast: {
-            select: function (name, id, elements) {
-                var str = '<select name="' + name + '" id="' + id + '">';
-
-                for (var i = 0; i < elements.length; i++) {
-                    str += elements[i]['input']
-                }
-
-                str += '</select>';
-
-                return str;
-            },
-            radio: function (name, id, elements) {
-                var str = '<table cellpadding="0" cellspacing="0" class="radio-table">';
-
-                for (var i = 0; i < elements.length; i++) {
-                    str += '<tr>' +
-                        '<td class="radiobutton">' +
-                        elements[i]['input'] +
-                        '</td>' +
-                        '<td class="radio_label">' +
-                        elements[i]['label'] +
-                        '</td>' +
-                        '</tr>'
-                }
-
-                str += '</table>';
-
-                return str;
-            },
-            checkbox: function (name, id, elements) {
-                var str = '<table cellpadding="0" cellspacing="0" class="checkbox-table">';
-
-                for (var i = 0; i < elements.length; i++) {
-                    str += '<tr>' +
-                        '<td class="checkbox">' +
-                        elements[i]['input'] +
-                        '</td>' +
-                        '<td class="checkbox_label">' +
-                        elements[i]['label'] +
-                        '</td>' +
-                        '</tr>'
-                }
-
-                str += '</table>';
-
-                return str;
-            }
-        },
-        ajax: function (url, method, data, successCallback, errorCallback) {
-            var request = new XMLHttpRequest();
-            errorCallback = errorCallback || function () {
-            };
-
-            request.open(method, url);
-            request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-            request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-            request.send(fieldValue.serialize(data, null));
-
-            request.onreadystatechange = function () {
-                if (request.status == 200 && request.readyState == 4) {
-                    successCallback(request.response);
-                }
-                if (request.status != 200) {
-                    errorCallback()
-                }
-            };
-        },
-        onChange: function (a, b) {},
-        formContext: function (a) {},
-        fieldContext: function (a) {},
-        submitCallback: function (a, b, c) {
-            c();
-            return !0;
-        },
-        validateCallback: function (a) {
-            return !0;
-        },
-        beforeSubmitCallback: function (c) {
-            c();
-            return !0;
-        },
-        afterSubmitCallback: function () {
-            return !0;
-        }
-    };
-
+Forms = (function() {
+    /* static, for all objects */
     var FLAG_UNIQUE_LABELS = 1,
         FLAG_DEBUG = 2,
         FLAG_SUBMIT_EMPTY = 4,
@@ -202,339 +76,89 @@ Forms = (function () {
         VALIDATION_KEY_ERR = 0,
         VALIDATION_KEY_WARN = 1;
 
-    var validate = {
-        setWarningMessage: function (name, msg) {
-            if (!validate.methods[name]) validate.methods[name] = [];
-            validate.methods[name][VALIDATION_KEY_WARN] = msg
-        },
-        setErrorMessage: function (name, msg) {
-            if (!validate.methods[name]) validate.methods[name] = [];
-            validate.methods[name][VALIDATION_KEY_ERR] = msg
-        },
-        setTestFunction: function (name, func) {
-            if (!validate.methods[name]) validate.methods[name] = [];
-            validate.methods[name][VALIDATION_KEY_TEST] = func
-        },
-        set: function (name, data) {
-            validate.methods[name] = data
-        },
-        remove: function (name) {
-            delete validate.methods[name]
-        },
-        methods: {
-            'multiple': [
-                'Must be a multiple of {val}',
-                'Should be a multiple of {val}',
-                function (val, rule) {
-                    return val % rule === 0;
-                }
-            ],
-            'email': [
-                'Wrong email format',
-                'Bad email format',
-                function (val, rule) {
-                    return /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(val)
-                }
-            ],
-            'int': [
-                'Must be an integer',
-                'Should be an integer',
-                function (val, rule) {
-                    return parseInt(val, 10) == val;
-                }
-            ],
-            'float': [
-                'Must be a decimal',
-                'Should be a decimal',
-                function (val, rule) {
-                    return /^-?\d{0,}([\.|\,]\d{0,})?$/.test(val);
-                }
-            ],
-            'min': [
-                'Must be >= {val}',
-                'Value is lower than {val}',
-                function (val, rule) {
-                    return (parseFloat(val) || 0) >= (parseFloat(rule) || 0)
-                }
-            ],
-            'max': [
-                'Must be <= {val}',
-                'Value is higher than {val}',
-                function (val, rule) {
-                    return (parseFloat(val) || 0) <= (parseFloat(rule) || 0)
-                }
-            ],
-            'date': [
-                'Wrong date format',
-                'Bad date format',
-                function (val, rule) {
-                    return /^([1-9]|0[1-9]|1[012])[- \/.](0[1-9]|[1-9]|[12][0-9]|3[01])[- \/.](19|20)\d\d$/.test(val);
-                }
-            ],
-            'length': [
-                'Must be {val} characters long',
-                'Should be {val} characters long',
-                function (val, rule) {
-                    return val.length == rule
-                }
-            ],
-            'maxLength': [
-                'Must be <= {val} characters long',
-                'Should be less than {val} characters long',
-                function (val, rule) {
-                    return val.length <= rule
-                }
-            ],
-            'minLength': [
-                'Must be >= {val} characters long',
-                'Should be more than {val} characters long',
-                function (val, rule) {
-                    return val.length <= rule
-                }
-            ],
-            'required': [
-                'Required field',
-                'This field is highly recommended to fill',
-                function (val, rule) {
-                    return !(val == '' || val == null || typeof val == undefined)
-                }
-            ]
-        },
-        hideError: function (warningObj) {
-            if (!warningObj) return;
-            addClass(warningObj, defaults.hideClass);
-        },
-        showError: function (warningObj, text) {
-            if (!warningObj) return;
-            warningObj.innerHTML = text;
-            removeClass(warningObj, defaults.hideClass);
-        },
-        field: function (form, fieldName, params, value, errorClass, warningClass) {
-            var fieldValid = !0;
-            var valid = !0;
+    var globalTabIndex = 0;
+    var fieldUniqueCounter = 1;
+    var formsList = {};
 
-            if (params[DATA_TYPE_VALIDATE]) {
-                for (var type in params[DATA_TYPE_VALIDATE]) {
-                    if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_VALIDATE], type)) {
-                        continue;
-                    }
-
-                    if (validate.methods[type] == undefined) continue;
-
-                    if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
-                        fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
-                            value,
-                            params[DATA_TYPE_VALIDATE][type]
-                        );
-                    }
-
-                    if (!fieldValid) {
-                        validate.showError(
-                            form.getErrorContainer(fieldName),
-                            validate.methods[type][VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
-                        );
-                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                            addClass(form.elements[fieldName], errorClass);
-                        }
-                        valid = !1;
-                        console.log(fieldName, 'is not valid');
-                        break;
-                    } else {
-                        if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
-                            validate.hideError(
-                                form.getErrorContainer(fieldName)
-                            );
-                        }
-                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                            removeClass(form.elements[fieldName], errorClass);
-                        }
-                    }
-                }
+    var defaultValidationMethods = {
+        'multiple': [
+            'Must be a multiple of {val}',
+            'Should be a multiple of {val}',
+            function (val, rule) {
+                return val % rule === 0;
             }
-
-            if (params[DATA_TYPE_WARNING]) {
-                for (var type in params[DATA_TYPE_WARNING]) {
-                    if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_WARNING], type)) {
-                        continue;
-                    }
-
-                    if (!validate.methods[type]) continue;
-
-                    if (!valid) {
-                        if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
-                            validate.hideError(
-                                form.getWarningContainer(fieldName)
-                            );
-                        }
-                        continue;
-                    }
-                    if (type == 'required' || (value != '' && value !== null && typeof value !== undefined)) {
-                        fieldValid = validate.methods[type][VALIDATION_KEY_TEST](
-                            value,
-                            params[DATA_TYPE_WARNING][type]
-                        );
-                    }
-
-                    if (!fieldValid) {
-                        validate.showError(
-                            form.getWarningContainer(fieldName),
-                            validate.methods[type][VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
-                        );
-                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                            addClass(form.elements[fieldName], warningClass);
-                        }
-                        break;
-                    } else {
-                        if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
-                            validate.hideError(
-                                form.getWarningContainer(fieldName)
-                            );
-                        }
-                        if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                            removeClass(form.elements[fieldName], warningClass);
-                        }
-                    }
-                }
+        ],
+        'email': [
+            'Wrong email format',
+            'Bad email format',
+            function (val, rule) {
+                return /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(val)
             }
-            return valid;
-        },
-        process: function (form, fields) {
-            var data = form.getFormData(1), valid = !0;
-
-            for (var i in fields) {
-                if (!Object.prototype.hasOwnProperty.call(fields, i)) {
-                    continue;
-                }
-
-                if (!fields[i][DATA_TYPE_VALIDATE] && !fields[i][DATA_TYPE_WARNING]) {
-                    continue;
-                }
-
-                if (!validate.field(form, i, fields[i], data[i], form.config['errorClass'] || defaults.classes.error,
-                                    form.config['warningClass'] || defaults.classes.warning)) {
-                    valid = !1;
-                }
+        ],
+        'int': [
+            'Must be an integer',
+            'Should be an integer',
+            function (val, rule) {
+                return parseInt(val, 10) == val;
             }
-
-            return valid;
-        }
+        ],
+        'float': [
+            'Must be a decimal',
+            'Should be a decimal',
+            function (val, rule) {
+                return /^-?\d{0,}([\.|\,]\d{0,})?$/.test(val);
+            }
+        ],
+        'min': [
+            'Must be >= {val}',
+            'Value is lower than {val}',
+            function (val, rule) {
+                return (parseFloat(val) || 0) >= (parseFloat(rule) || 0)
+            }
+        ],
+        'max': [
+            'Must be <= {val}',
+            'Value is higher than {val}',
+            function (val, rule) {
+                return (parseFloat(val) || 0) <= (parseFloat(rule) || 0)
+            }
+        ],
+        'date': [
+            'Wrong date format',
+            'Bad date format',
+            function (val, rule) {
+                return /^([1-9]|0[1-9]|1[012])[- \/.](0[1-9]|[1-9]|[12][0-9]|3[01])[- \/.](19|20)\d\d$/.test(val);
+            }
+        ],
+        'length': [
+            'Must be {val} characters long',
+            'Should be {val} characters long',
+            function (val, rule) {
+                return val.length == rule
+            }
+        ],
+        'maxLength': [
+            'Must be <= {val} characters long',
+            'Should be less than {val} characters long',
+            function (val, rule) {
+                return val.length <= rule
+            }
+        ],
+        'minLength': [
+            'Must be >= {val} characters long',
+            'Should be more than {val} characters long',
+            function (val, rule) {
+                return val.length <= rule
+            }
+        ],
+        'required': [
+            'Required field',
+            'This field is highly recommended to fill',
+            function (val, rule) {
+                return !(val == '' || val == null || typeof val == 'undefined')
+            }
+        ]
     };
-
-    function differs(a, b) {
-        if (typeof a == typeof b && ("string" == typeof b || "number" == typeof b))return a != b;
-        if ("object" == typeof a && "object" == typeof b && a !== null && b !== null) {
-            var c;
-            for (c in a)if (differs(a[c], b[c]))return!0;
-            for (c in b)if (differs(a[c], b[c]))return!0
-        } else if (typeof a != typeof b)return!0;
-        return!1
-    }
-
-    function error() {
-        throw new Error(Array.prototype.slice.call(arguments).join(', '))
-    }
-
-    function warning() {
-        console.log(Array.prototype.slice.call(arguments).join(', '))
-    }
-
-    function setFieldValue(elem, value) {
-        if (!elem) return;
-
-        var setValue = function (el, val) {
-            var tagName = el.tagName.toLowerCase();
-
-            switch (tagName) {
-                case 'select':
-                    var options = el.children, found = !1;
-                    for (var i = 0, opts; opts = options[i]; i++) {
-                        if (val == opts.value) {
-                            opts.setAttribute('selected', '1');
-                            opts.selected = !0;
-                            found = !0;
-                            continue;
-                        }
-
-                        opts.removeAttribute('selected');
-                        opts.selected = !1;
-                    }
-
-                    if (!found) {
-                        el.selectedIndex = -1
-                    }
-                    break;
-                case 'input':
-                    switch (el.type) {
-                        case 'radio':
-                            if (val == el.value) {
-                                el.setAttribute('checked', 'true');
-                                el.checked = !0;
-                            } else {
-                                el.removeAttribute('checked');
-                                el.checked = !1;
-                            }
-                            break;
-                        case 'password':
-                        case 'hidden':
-                        case 'text':
-                            if (typeof val == 'object') {
-                                el.setAttribute('value', val);
-                                el.value = val;
-                            } else {
-                                el.setAttribute('value', val);
-                                el.value = val;
-                            }
-                            break;
-                        case 'checkbox':
-                            var isBitmask = el.hasAttribute('bitmask');
-                            if ((isBitmask && !!(el.value & val)) || (!!val && val !== '0' && val !== '!1' && !isBitmask)) {
-                                el.setAttribute('checked', 'true');
-                                el.checked = !0;
-                            } else {
-                                el.removeAttribute('checked');
-                                el.checked = !1;
-                            }
-                            break;
-                    }
-                    break;
-                case 'textarea':
-                    el.innerHTML = val;
-                    el.value = val;
-                    break;
-            }
-        };
-
-        /* in case if field name is xxx[] array */
-        if (typeof value == 'object' && elem.length) {
-            for (var i = 0, el; el = elem[i]; i++) {
-                setValue(el, value !== null && value[i] ? value[i] : null);
-            }
-            return;
-        }
-        if (elem.length && !elem.tagName) {
-            for (var i = 0, el; el = elem[i]; i++) {
-                setValue(el, value);
-            }
-            return;
-        }
-
-        setValue(elem, value);
-    }
-
-    var addClass = function (element, className) {
-        if (hasClass(element, className)) return;
-        element.className = (element.className + ' ' + className).trim();
-    };
-    var hasClass = function (element, className) {
-        return (new RegExp("( |^)" + className + "( |$)", "g")).test(element.className);
-    };
-    var removeClass = function (element, className) {
-        var reg = new RegExp("( |^)" + className + "( |$)", "g");
-        element.className = element.className.replace(reg, function (a, b, c) {
-            return b == c ? c : ''
-        })
-    };
-
     var fieldValue = {
         allReg : /\[([a-zA-Z0-9-]*)\]/g,
         isObjReg : /\[(.*)\]/g,
@@ -593,7 +217,7 @@ Forms = (function () {
 
             if (next === undefined) {
                 if (name == '') {
-                    if (!ref.push) return false;
+                    if (!ref.push) return !1;
                     ref.push(
                         value
                     );
@@ -621,15 +245,118 @@ Forms = (function () {
             fieldValue.setVal(arr, value, reference);
         }
     };
+    function error() {
+        throw new Error(Array.prototype.slice.call(arguments).join(', '))
+    }
+    function warning() {
+        console.log(Array.prototype.slice.call(arguments).join(', '))
+    }
+    function bindFormEvents(form) {
+        if (!(form.config[PARAM_FLAGS] & FLAG_ASYNC)) {
+            /* if not async */
+            form.submit = function (callback) {
+                form.container.submit(callback);
+            };
+            return;
+        }
 
-    function formToArray(form, emptyFields) {
+        var submit = function () {
+            var lastOne = arguments[arguments.length - 1];
+            var callback = typeof lastOne == 'function' ? lastOne : function() {};
+
+            var submitCallback = form.config[PARAM_SUBMIT_CALLBACK] || form.defaults.submitCallback,
+                validateCallback = form.config[PARAM_ON_VALIDATE] || form.defaults.validateCallback,
+                beforeSubmit = form.config[PARAM_BEFORE_SUBMIT] || form.defaults.beforeSubmitCallback,
+                afterSubmit = form.config[PARAM_AFTER_SUBMIT] || form.defaults.afterSubmitCallback,
+                onSubmit = form.config[PARAM_ON_SUBMIT] || function (cb) {
+                    cb = cb || function() {};
+
+                    var isValid = form.validate();
+
+                    validateCallback(isValid);
+
+                    if (isValid) {
+                        var data = form.getFormData();
+
+                        if (form.config[PARAM_PARAMS]) {
+                            for (var i in form.config[PARAM_PARAMS]) {
+                                data[i] = form.config[PARAM_PARAMS][i];
+                            }
+                        }
+
+                        form.defaults.ajax(form.action, "POST", data, (function (cb) {
+                            return function (status, data) {
+                                submitCallback.call(form, status, data, cb);
+                            }
+                        })(cb));
+
+                        form.saveChanges();
+
+                        return !0;
+                    }
+
+                    return !1;
+                };
+
+            beforeSubmit(function () {
+                if (onSubmit(callback)) afterSubmit()
+            });
+        };
+
+        form.container.submit = form.submit = submit;
+
+        bind(form.container, 'submit', function (e) {
+            if (e.preventDefault) e.preventDefault();
+            submit();
+            e.returnValue = !1;
+            return !1;
+        });
+    }
+    function generateElement(type, name, id, elements) {
+        var str = '';
+
+        switch (type) {
+            case 'select':
+                str = '<select name="' + name + '" id="' + id + '">';
+
+                for (var i = 0, el; el = elements[i]; i++) {
+                    str += el['input']
+                }
+
+                str += '</select>';
+                break;
+            case 'radio':
+            case 'checkbox':
+                str = '<table cellpadding="0" cellspacing="0" class="forms-' + type + '-table">';
+
+                for (var i = 0, el; el = elements[i]; i++) {
+                    str += '' +
+                        '<tr>' +
+                        '<td>' +
+                        el['input'] +
+                        '</td>' +
+                        '<td>' +
+                        el['label'] +
+                        '</td>' +
+                        '</tr>'
+                }
+
+                str += '</table>';
+                break;
+            default :
+                return false
+        }
+
+        return str;
+    }
+    function formToArray(formContainer, emptyFields) {
         var result = {};
 
-        if (!form.length) {
+        if (!formContainer.length) {
             return result;
         }
 
-        for (var i = 0, element; element = form[i]; i++) {
+        for (var i = 0, element; element = formContainer[i]; i++) {
             var name = element.name;
 
             var getFieldValue = function (elem) {
@@ -718,7 +445,154 @@ Forms = (function () {
 
         return result;
     }
+    function setFieldValue(elem, value) {
+        if (!elem) return;
 
+        var setValue = function (el, val) {
+            var tagName = el.tagName.toLowerCase();
+
+            switch (tagName) {
+                case 'select':
+                    var options = el.children, found = false;
+                    for (var i = 0, opts; opts = options[i]; i++) {
+                        if (val == opts.value) {
+                            opts.setAttribute('selected', '1');
+                            opts.selected = !0;
+                            found = i;
+                            continue;
+                        }
+
+                        opts.removeAttribute('selected');
+                        opts.selected = !1;
+                    }
+
+                    if (found === false) {
+                        el.selectedIndex = -1
+                    } else {
+                        el.selectedIndex = found
+                    }
+                    break;
+                case 'input':
+                    switch (el.type) {
+                        case 'radio':
+                            if (val == el.value) {
+                                el.setAttribute('checked', 'true');
+                                el.checked = !0;
+                            } else {
+                                el.removeAttribute('checked');
+                                el.checked = !1;
+                            }
+                            break;
+                        case 'password':
+                        case 'hidden':
+                        case 'text':
+                            if (typeof val == 'object') {
+                                el.setAttribute('value', val);
+                                el.value = val;
+                            } else {
+                                el.setAttribute('value', val);
+                                el.value = val;
+                            }
+                            break;
+                        case 'checkbox':
+                            var isBitmask = el.hasAttribute('bitmask');
+                            if ((isBitmask && !!(el.value & val)) || (!!val && val !== '0' && val !== '!1' && !isBitmask)) {
+                                el.setAttribute('checked', 'true');
+                                el.checked = !0;
+                            } else {
+                                el.removeAttribute('checked');
+                                el.checked = !1;
+                            }
+                            break;
+                    }
+                    break;
+                case 'textarea':
+                    el.innerHTML = val;
+                    el.value = val;
+                    break;
+            }
+        };
+
+        /* in case if field name is xxx[] array */
+        if (typeof value == 'object' && elem.length) {
+            for (var i = 0, el; el = elem[i]; i++) {
+                setValue(el, value !== null && value[i] ? value[i] : null);
+            }
+            return;
+        }
+        if (elem.length && !elem.tagName) {
+            for (var i = 0, el; el = elem[i]; i++) {
+                setValue(el, value);
+            }
+            return;
+        }
+
+        setValue(elem, value);
+    }
+    function fireEvent(obj, evt) {
+        if (obj === undefined) return;
+        var evObj;
+        if (document.createEvent) {
+            evObj = document.createEvent('MouseEvents');
+            evObj.initEvent(evt, !0, !1);
+            if (obj.length && obj.name == undefined) {
+                for (var i = 0; i < obj.length; i++)  obj[i].dispatchEvent(evObj)
+                return
+            }
+            obj.dispatchEvent(evObj);
+        } else if (document.createEventObject) { //IE
+            evObj = document.createEventObject();
+            if (obj.fireEvent === undefined || typeof obj.fireEvent != 'function') {
+                return;
+            }
+            obj.fireEvent('on' + evt, evObj);
+        }
+    }
+    function getStandartValidationMethod(method) {
+        if (!defaultValidationMethods[method]) {
+            return false
+        }
+        return defaultValidationMethods[method];
+    }
+    function addClass(element, className) {
+        if (hasClass(element, className)) return;
+        element.className = (element.className + ' ' + className).trim();
+    }
+    function hasClass(element, className) {
+        return (new RegExp("( |^)" + className + "( |$)", "g")).test(element.className);
+    }
+    function removeClass(element, className) {
+        var reg = new RegExp("( |^)" + className + "( |$)", "g");
+        element.className = element.className.replace(reg, function (a, b, c) {
+            return b == c ? c : ''
+        })
+    }
+    function elementsProcess(callback) {
+        var setElements = !this.elements;
+        if (setElements) {
+            this.elements = {};
+        }
+
+        for (var i = 0, elem; elem = this.container[i]; i++) {
+            if (setElements) {
+                if (this.elements[elem.name]) {
+                    if (Object.prototype.toString.call(this.elements[elem.name]) === "[object Array]") {
+                        this.elements[elem.name].push(elem);
+                    } else {
+                        this.elements[elem.name] = Array.prototype.concat(this.elements[elem.name], elem);
+                    }
+                } else {
+                    this.elements[elem.name] = elem;
+                }
+            }
+            callback(elem);
+        }
+    }
+    function clear() {
+        elementsProcess.call(this, function (el) {
+            this.setField(el.name, '')
+        }.bind(this))
+    }
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
         obj.setAttribute('class', 'form_' + type + '_' + name);
@@ -726,16 +600,33 @@ Forms = (function () {
 
         return obj;
     }
-
-    function createTextContainer(className) {
+    function createTextContainer(className, hideClassName) {
         var span = document.createElement('SPAN');
         span.className = className;
 
-        addClass(span, defaults.hideClass);
+        addClass(span, hideClassName);
 
         return span;
     }
+    function getNotificationContainer(type, name, classname) {
+        var container = this.notificationContainers[type];
+        if (container[name] === void 0) {
+            var errorContainer = findElementByNameAndType(this.container, name, type);
+            if (!errorContainer) {
+                if (!this.fieldContainers[name]) return;
 
+                errorContainer = createMsgContainer(name, type, this.fieldContainers[name].tagName);
+                this.fieldContainers[name].parentNode.insertBefore(errorContainer, this.fieldContainers[name].nextSibling);
+            }
+            if (!errorContainer.children.length) {
+                errorContainer.appendChild(createTextContainer(classname, this.options.defaults.hideClass));
+            }
+
+            container[name] = errorContainer;
+        }
+
+        return this.notificationContainers[type][name].children[0]
+    }
     function bind(obj, evt, fnc) {
         // W3C model
         if (obj.addEventListener) {
@@ -763,111 +654,6 @@ Forms = (function () {
             return !0;
         }
     }
-
-    function bindFormEvents(form) {
-        if (!(form.config[PARAM_FLAGS] & FLAG_ASYNC)) {
-            /* if not async */
-            form.submit = function (callback) {
-                form.container.submit(callback);
-            };
-            return;
-        }
-
-        var submit = function () {
-            var lastOne = arguments[arguments.length - 1];
-            var callback = typeof lastOne == 'function' ? lastOne : function() {};
-
-            var submitCallback = form.config[PARAM_SUBMIT_CALLBACK] || defaults.submitCallback,
-                validateCallback = form.config[PARAM_ON_VALIDATE] || defaults.validateCallback,
-                beforeSubmit = form.config[PARAM_BEFORE_SUBMIT] || defaults.beforeSubmitCallback,
-                afterSubmit = form.config[PARAM_AFTER_SUBMIT] || defaults.afterSubmitCallback,
-                onSubmit = form.config[PARAM_ON_SUBMIT] || function (cb) {
-                    cb = cb || function() {};
-
-                    var isValid = form.validate();
-
-                    validateCallback(isValid);
-
-                    if (isValid) {
-                        var data = form.getFormData();
-
-                        if (form.config[PARAM_PARAMS]) {
-                            for (var i in form.config[PARAM_PARAMS]) {
-                                data[i] = form.config[PARAM_PARAMS][i];
-                            }
-                        }
-
-                        defaults.ajax(form.action, "POST", data, (function (cb) {
-                            return function (status, data) {
-                                submitCallback.call(form, status, data, cb);
-                            }
-                        })(cb));
-
-                        form.saveChanges();
-
-                        return !0;
-                    }
-
-                    return !1;
-                };
-
-            beforeSubmit(function () {
-                if (onSubmit(callback)) afterSubmit()
-            });
-        };
-
-        form.container.submit = form.submit = submit;
-
-        bind(form.container, 'submit', function (e) {
-            if (e.preventDefault) e.preventDefault();
-            submit();
-            e.returnValue = !1;
-            return !1;
-        });
-    }
-
-    function fireEvent(obj, evt) {
-        if (obj === undefined) return;
-        var evObj;
-        if (document.createEvent) {
-            evObj = document.createEvent('MouseEvents');
-            evObj.initEvent(evt, true, false);
-            if (obj.length && obj.name == undefined) {
-                for (var i = 0; i < obj.length; i++)  obj[i].dispatchEvent(evObj)
-                return
-            }
-            obj.dispatchEvent(evObj);
-        } else if (document.createEventObject) { //IE
-            evObj = document.createEventObject();
-            if (obj.fireEvent === undefined || typeof obj.fireEvent != 'function') {
-                return;
-            }
-            obj.fireEvent('on' + evt, evObj);
-        }
-    }
-
-    function elementsProcess(callback) {
-        var setElements = !this.elements;
-        if (setElements) {
-            this.elements = {};
-        }
-
-        for (var i = 0, elem; elem = this.container[i]; i++) {
-            if (setElements) {
-                if (this.elements[elem.name]) {
-                    if (Object.prototype.toString.call(this.elements[elem.name]) === "[object Array]") {
-                        this.elements[elem.name].push(elem);
-                    } else {
-                        this.elements[elem.name] = Array.prototype.concat(this.elements[elem.name], elem);
-                    }
-                } else {
-                    this.elements[elem.name] = elem;
-                }
-            }
-            callback(elem);
-        }
-    }
-
     function findElementByNameAndType(parent, name, type) {
         var result;
         if (!parent.allChildren) {
@@ -888,11 +674,9 @@ Forms = (function () {
 
         return result[0] ? result : null;
     }
-
-    function insertFields(form, fieldsList, uniqueLabels, debugMode, templates) {
+    function insertFields(form, fieldsList, uniqueLabels, debugMode) {
         debugMode = debugMode || !1;
         uniqueLabels = uniqueLabels || !1;
-        templates = templates || defaults.templateFast;
 
         if (!fieldsList) return;
 
@@ -901,29 +685,6 @@ Forms = (function () {
         form.errorContainers = {};
         form.warningContainers = {};
         form.fieldContainers = {};
-
-        function elementToString(elem) {
-            var tmp = document.createElement("p");
-            tmp.appendChild(elem);
-            return tmp.innerHTML;
-        }
-
-        function getTagNameByType(type) {
-            switch (type) {
-                case 'option':
-                case 'select':
-                case 'textarea':
-                    return type;
-                case 'text':
-                case 'hidden':
-                case 'password':
-                case 'checkbox':
-                case 'radio':
-                    return 'input';
-                default :
-                    return '';
-            }
-        }
 
         var getLabelElement = function (text, forId) {
             var label = document.createElement('LABEL');
@@ -977,7 +738,7 @@ Forms = (function () {
                 }
             }
 
-            form.fieldContainers[fieldName].innerHTML = (function (data, id, type, name, isLabel, templates) {
+            form.fieldContainers[fieldName].innerHTML = (function (data, id, type, name, isLabel) {
                 /* creating an html to insert into fieldContainer */
                 var elementsData = [];
 
@@ -987,6 +748,7 @@ Forms = (function () {
                 for (var i in data) length++;
 
                 var isMultiple = length >= 2;
+
                 for (var key in data) {
                     var elementId = id + (isMultiple ? '-' + elementIndex : '');
                     var tmpElement, dataToPush = {};
@@ -1015,41 +777,14 @@ Forms = (function () {
                     elementIndex++;
                 }
 
-                if (templates[type]) {
-                    return templates[type](name, id, elementsData);
-                }
+                var str = generateElement(type, name, id, elementsData);
 
-                return elementsData[0]['input'];
-            })(dataArr, fieldId, fieldType, fieldName, !!labelContainer, templates);
+                return str ? str : elementsData[0]['input'];
+
+            })(dataArr, fieldId, fieldType, fieldName, !!labelContainer);
         }
     }
-
-    function getNotificationContainer(type, name) {
-        var container = this.notificationContainers[type];
-        if (container[name] === void 0) {
-            var errorContainer = findElementByNameAndType(this.container, name, type);
-            if (!errorContainer) {
-                if (!this.fieldContainers[name]) return;
-
-                errorContainer = createMsgContainer(name, type, this.fieldContainers[name].tagName);
-                this.fieldContainers[name].parentNode.insertBefore(errorContainer, this.fieldContainers[name].nextSibling);
-            }
-            if (!errorContainer.children.length) {
-                errorContainer.appendChild(createTextContainer(this.config[type + 'Class'] || defaults.classes[type]));
-            }
-
-            container[name] = errorContainer;
-        }
-
-        return this.notificationContainers[type][name].children[0]
-    }
-
-    function clear() {
-        elementsProcess.call(this, function (el) {
-            this.setField(el.name, '')
-        }.bind(this))
-    }
-
+    
     /* IE8 fix */
     (function (d, g) {
         if (window.Element === undefined) return;
@@ -1057,16 +792,199 @@ Forms = (function () {
             return this.querySelectorAll("." + g)
         }, Element.prototype[g] = d[g])
     })(document, "getElementsByClassName");
+    
+    function FormFactoryConstructor(def) {
+        /* private static for every object of this factory */
+        var defaults = {
+            flags: def['flags'] || 0,
+            hideClass: def['hideClass'] || 'h',
+            errorClass: def['errorClass'] || 'error',
+            warningClass: def['warningClass'] || 'warning',
+            ajax: def['ajax'] || function (url, method, data, successCallback, errorCallback) {
+                var request = new XMLHttpRequest();
+                errorCallback = errorCallback || function () {};
 
-    return {
-        Form: function (conf) {
+                request.open(method, url);
+                request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+                request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                request.send(fieldValue.serialize(data, null));
+
+                request.onreadystatechange = function () {
+                    if (request.status == 200 && request.readyState == 4) {
+                        successCallback(request.response);
+                    }
+                    if (request.status != 200) {
+                        errorCallback()
+                    }
+                };
+            },
+            onChange: def['onChange'] || function (a, b) {},
+            formContext: def['formContext'] || function (a) {},
+            fieldContext: def['fieldContext'] || function (a) {},
+            submitCallback: def['submitCallback'] || function (a, b, c) {
+                c();
+                return !0;
+            },
+            validateCallback: def['validateCallback'] || function (a) {
+                return !0;
+            },
+            beforeSubmitCallback: def['beforeSubmitCallback'] || function (c) {
+                c();
+                return !0;
+            },
+            afterSubmitCallback: def['afterSubmitCallback'] || function () {
+                return !0;
+            }
+        };
+        var validate = {
+            methods: {},
+            hideError: function (warningObj) {
+                if (!warningObj) return;
+                addClass(warningObj, defaults.hideClass);
+            },
+            showError: function (warningObj, text) {
+                if (!warningObj) return;
+                warningObj.innerHTML = text;
+                removeClass(warningObj, defaults.hideClass);
+            },
+            field: function (form, fieldName, params, value, errorClass, warningClass) {
+                var fieldValid = !0;
+                var valid = !0;
+
+                if (params[DATA_TYPE_VALIDATE]) {
+                    for (var type in params[DATA_TYPE_VALIDATE]) {
+                        if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_VALIDATE], type)) {
+                            continue;
+                        }
+
+                        /* custom methods overwrite standard onse */
+                        var validationMethod = validate.methods[type] || getStandartValidationMethod(type);
+
+                        if (!validationMethod) continue;
+
+                        if (type == 'required' || (value != '' && value !== null && typeof value != 'undefined')) {
+                            fieldValid = validationMethod[VALIDATION_KEY_TEST](
+                                value,
+                                params[DATA_TYPE_VALIDATE][type]
+                            );
+                        }
+
+                        if (!fieldValid) {
+                            validate.showError(
+                                form.getErrorContainer(fieldName),
+                                validationMethod[VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
+                            );
+                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                                addClass(form.elements[fieldName], errorClass);
+                            }
+                            valid = !1;
+                            console.log(fieldName, 'is not valid');
+                            break;
+                        } else {
+                            if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
+                                validate.hideError(
+                                    form.getErrorContainer(fieldName)
+                                );
+                            }
+                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                                removeClass(form.elements[fieldName], errorClass);
+                            }
+                        }
+                    }
+                }
+
+                if (params[DATA_TYPE_WARNING]) {
+                    for (var type in params[DATA_TYPE_WARNING]) {
+                        if (!Object.prototype.hasOwnProperty.call(params[DATA_TYPE_WARNING], type)) {
+                            continue;
+                        }
+
+                        var validationMethod = validate.methods[type] || getStandartValidationMethod(type);
+
+                        if (!validationMethod) continue;
+
+                        if (!valid) {
+                            if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
+                                validate.hideError(
+                                    form.getWarningContainer(fieldName)
+                                );
+                            }
+                            continue;
+                        }
+                        if (type == 'required' || (value != '' && value !== null && typeof value != 'undefined')) {
+                            fieldValid = validationMethod[VALIDATION_KEY_TEST](
+                                value,
+                                params[DATA_TYPE_WARNING][type]
+                            );
+                        }
+
+                        if (!fieldValid) {
+                            validate.showError(
+                                form.getWarningContainer(fieldName),
+                                validationMethod[VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
+                            );
+                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                                addClass(form.elements[fieldName], warningClass);
+                            }
+                            break;
+                        } else {
+                            if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
+                                validate.hideError(
+                                    form.getWarningContainer(fieldName)
+                                );
+                            }
+                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
+                                removeClass(form.elements[fieldName], warningClass);
+                            }
+                        }
+                    }
+                }
+                return valid;
+            },
+            process: function (form, fields) {
+                var data = form.getFormData(1), valid = !0;
+
+                for (var i in fields) {
+                    if (!Object.prototype.hasOwnProperty.call(fields, i)) {
+                        continue;
+                    }
+
+                    if (!fields[i][DATA_TYPE_VALIDATE] && !fields[i][DATA_TYPE_WARNING]) {
+                        continue;
+                    }
+
+                    if (!validate.field(form, i, fields[i], data[i], defaults.errorClass, defaults.warningClass)) {
+                        valid = !1;
+                    }
+                }
+
+                return valid;
+            }
+        };
+
+        /* adding custom validations for all objects of current factory */
+        if (def['validation']) {
+            for (var method in def['validation']) {
+                if (!Object.prototype.hasOwnProperty.call(def['validation'], method)) {
+                    continue;
+                }
+
+                validate.methods[method] = def['validation'][method];
+            }
+        }
+
+        function Form(conf) {
             var opt = {
-                cache: null,
-                config: conf || null,
-                initialized: !1,
-                container: null
-            };
-            var form = this;
+                    cache: null,
+                    formDataCache: null,
+                    config: null,
+                    defaults: defaults,
+                    initialized: !1,
+                    container: null
+                },
+                form = this;
+
+            opt.config = opt.config || conf;
 
             function processConfig(c) {
                 /* TODO check if incoming object is valid */
@@ -1090,8 +1008,14 @@ Forms = (function () {
             };
 
             form.isChanged = !1;
+            form.differsObj = {};
+            form.prevValues = {};
+            form.valuesCache = {};
+            form.lastChangedStatus = !1;
 
             form.config = opt.config;
+            form.options = opt;
+            form.defaults = defaults;
 
             if (!processConfig(opt.config)) {
                 warning(MSG_NO_CONFIG);
@@ -1110,22 +1034,23 @@ Forms = (function () {
 
             if (!form.container) return;
 
-            var formDataCache = null;
+            opt.config[PARAM_FLAGS] = opt.config[PARAM_FLAGS] ? (opt.config[PARAM_FLAGS] | defaults.flags) : defaults.flags;
+
+            console.log('opt.config[PARAM_FLAGS]', opt.config[PARAM_FLAGS]);
+
             var emptyFields = !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
             form.getFormData = function (renewCache) {
-                if (formDataCache && !form.isChanged && !renewCache) {
-                    return cloneObject(formDataCache);
+                if (opt.formDataCache && !form.isChanged && !renewCache) {
+                    /* TODO rethink how to make it without cloning an object, feels wrong */
+                    return cloneObject(opt.formDataCache);
                 }
-                formDataCache = formToArray(form.container, emptyFields);
-                return formDataCache;
+                opt.formDataCache = formToArray(form.container, emptyFields);
+                return opt.formDataCache;
             };
 
             if (opt.config[PARAM_ACTION]) {
                 opt.container.setAttribute(PARAM_ACTION, opt.config[PARAM_ACTION])
             }
-            form.differsObj = {};
-            form.prevValues = {};
-            form.valuesCache = {};
 
             form.action = opt.container.getAttribute('action');
 
@@ -1139,15 +1064,15 @@ Forms = (function () {
             };
             form.validate = function (fieldName) {
                 if (fieldName) {
-                    var data = form.getFormData(true);
+                    var data = form.getFormData(!0);
 
                     return validate.field(
                         form,
                         fieldName,
                         form.config[PARAM_FIELDS][fieldName],
                         data[fieldName],
-                        form.config['errorClass'] || defaults.classes.error,
-                        form.config['warningClass'] || defaults.classes.warning
+                        defaults.errorClass,
+                        defaults.warningClass
                     )
                 }
                 return form.config[PARAM_VALIDATE] ?
@@ -1161,33 +1086,32 @@ Forms = (function () {
             form.notificationContainers[FIELD_TYPE_WARNING] = {};
 
             form.getErrorContainer = function (name) {
-                return getNotificationContainer.call(form, FIELD_TYPE_ERROR, name)
+                return getNotificationContainer.call(form, FIELD_TYPE_ERROR, name, defaults.errorClass)
             };
 
             form.getWarningContainer = function (name) {
-                return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name)
+                return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name, defaults.warningClass)
             };
 
-            form.lastChangedStatus = false;
-
             form.initInputs = function () {
-                var index = 0;
-
                 var fieldsList = opt.config[PARAM_FIELDS] || {};
                 var data = opt.config[PARAM_DATA];
-                var validationType = opt.config[PARAM_VALIDATION_TYPE] || Forms.VALIDATION_ON_SUBMIT;
+                var validationType = opt.config[PARAM_VALIDATION_TYPE] || VALIDATION_ON_SUBMIT;
                 var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
                 var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) { console.log('fieldChange fired', arguments )};
 
                 var onChange = function (e, fieldName, type) {
                     switch (type) {
-                        case Forms.VALIDATION_ON_CHANGE:
+                        case VALIDATION_ON_CHANGE:
                             if (e.type == 'blur') {
                                 this.validate(fieldName)
                             }
                             break;
-                        case Forms.VALIDATION_ON_KEYUP:
+                        case VALIDATION_ON_KEYUP:
                             this.validate(fieldName);
+                            break;
+                        case VALIDATION_ON_SUBMIT:
+                            this.getFormData(!0);
                             break;
                     }
                     var savedValue = fieldValue.get(fieldName, this.valuesCache);
@@ -1225,8 +1149,8 @@ Forms = (function () {
                             return;
                         }
 
-                        elem.setAttribute('tabindex', ++index);
-                        elem.formIndex = elem.formIndex || index;
+                        elem.setAttribute('tabindex', ++globalTabIndex);
+                        elem.formIndex = elem.formIndex || globalTabIndex;
                     })();
 
                     var name = elem.name;
@@ -1301,7 +1225,7 @@ Forms = (function () {
             form.saveChanges = function () {
                 /* stores saved changes */
                 form.differsObj = {};
-                form.lastChangedStatus = false;
+                form.lastChangedStatus = !1;
                 form.prevValues = form.getFormData();
                 form.valuesCache = form.getFormData();
                 (opt.config[PARAM_ON_CHANGE] || defaults.onChange)(!1, form);
@@ -1313,8 +1237,7 @@ Forms = (function () {
                 form,
                 opt.config[PARAM_FIELDS],
                 !!(opt.config[PARAM_FLAGS] & FLAG_UNIQUE_LABELS),
-                !!(opt.config[PARAM_FLAGS] & FLAG_DEBUG),
-                opt.config[PARAM_TEMPLATES]
+                !!(opt.config[PARAM_FLAGS] & FLAG_DEBUG)
             );
             form.getFieldValue = function(name) {
                 if (!form.elements[name]) return;
@@ -1328,8 +1251,6 @@ Forms = (function () {
             }
 
             /* stores current changes */
-//            form.valuesCache = form.getFormData();
-
             bindFormEvents(form);
 
             form.saveChanges();
@@ -1345,6 +1266,15 @@ Forms = (function () {
             form.remove();
 
             formsList[opt.config[PARAM_ID]] = form;
+        }
+
+        this.create = Form;
+    }
+
+    return {
+        Form: FormFactoryConstructor,
+        remove: function (id) {
+            if (formsList[id]) delete formsList[id]
         },
         VALIDATION_ON_SUBMIT: VALIDATION_ON_SUBMIT,
         VALIDATION_ON_CHANGE: VALIDATION_ON_CHANGE,
@@ -1352,20 +1282,6 @@ Forms = (function () {
         FLAG_DEBUG: FLAG_DEBUG,
         FLAG_SUBMIT_EMPTY: FLAG_SUBMIT_EMPTY,
         FLAG_UNIQUE_LABELS: FLAG_UNIQUE_LABELS,
-        FLAG_ASYNC: FLAG_ASYNC,
-        defaults: defaults,
-        remove: function (id) {
-            if (formsList[id]) delete formsList[id]
-        },
-        validation: {
-            setWarningMessage: validate.setWarningMessage,
-            setErrorMessage: validate.setErrorMessage,
-            setTestFunction: validate.setTestFunction,
-            'set': validate.set,
-            remove: validate.remove
-        },
-        getList: function () {
-            return formsList
-        }
+        FLAG_ASYNC: FLAG_ASYNC
     }
 })();
