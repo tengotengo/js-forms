@@ -20,7 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
+ 
 Forms = (function() {
     /* static, for all objects */
     var FLAG_UNIQUE_LABELS = 1,
@@ -332,11 +332,11 @@ Forms = (function() {
                 for (var i = 0, el; el = elements[i]; i++) {
                     str += '' +
                         '<tr>' +
-                        '<td>' +
-                        el['input'] +
+                        '<td class="forms-' + type + '">' +
+                            el['input'] +
                         '</td>' +
-                        '<td>' +
-                        el['label'] +
+                        '<td class="forms-label-' + type + '">' +
+                            el['label'] +
                         '</td>' +
                         '</tr>'
                 }
@@ -784,7 +784,7 @@ Forms = (function() {
             })(dataArr, fieldId, fieldType, fieldName, !!labelContainer);
         }
     }
-    
+
     /* IE8 fix */
     (function (d, g) {
         if (window.Element === undefined) return;
@@ -792,11 +792,12 @@ Forms = (function() {
             return this.querySelectorAll("." + g)
         }, Element.prototype[g] = d[g])
     })(document, "getElementsByClassName");
-    
+
     function FormFactoryConstructor(def) {
         /* private static for every object of this factory */
         var defaults = {
             flags: def['flags'] || 0,
+            validationType: def['validationType'] || Forms.VALIDATION_ON_SUBMIT,
             hideClass: def['hideClass'] || 'h',
             errorClass: def['errorClass'] || 'error',
             warningClass: def['warningClass'] || 'warning',
@@ -811,7 +812,7 @@ Forms = (function() {
 
                 request.onreadystatechange = function () {
                     if (request.status == 200 && request.readyState == 4) {
-                        successCallback(request.response);
+                        successCallback(request.status, request.response);
                     }
                     if (request.status != 200) {
                         errorCallback()
@@ -1036,6 +1037,10 @@ Forms = (function() {
 
             opt.config[PARAM_FLAGS] = opt.config[PARAM_FLAGS] ? (opt.config[PARAM_FLAGS] | defaults.flags) : defaults.flags;
 
+            if (!opt.config[PARAM_VALIDATION_TYPE]) {
+                opt.config[PARAM_VALIDATION_TYPE] = defaults.validationType;
+            }
+
             console.log('opt.config[PARAM_FLAGS]', opt.config[PARAM_FLAGS]);
 
             var emptyFields = !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
@@ -1058,6 +1063,19 @@ Forms = (function() {
                 if (!form.elements[name]) return;
                 setFieldValue(form.elements[name], value);
                 fireEvent(form.elements[name], 'formChange');
+            };
+            form.setFields = function (arr) {
+                for (var i in arr) {
+                    if (!Object.prototype.hasOwnProperty.call(arr, i)) {
+                        continue;
+                    }
+                    if (!form.elements[i]) continue;
+
+                    setFieldValue(form.elements[i], arr[i]);
+                    fireEvent(form.elements[i], 'formChange');
+                }
+
+                form.getFormData(!0);
             };
             form.getField = function (name) {
                 return form.elements[name];
@@ -1096,11 +1114,15 @@ Forms = (function() {
             form.initInputs = function () {
                 var fieldsList = opt.config[PARAM_FIELDS] || {};
                 var data = opt.config[PARAM_DATA];
-                var validationType = opt.config[PARAM_VALIDATION_TYPE] || VALIDATION_ON_SUBMIT;
+                var validationType = opt.config[PARAM_VALIDATION_TYPE];
                 var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
                 var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) { console.log('fieldChange fired', arguments )};
 
                 var onChange = function (e, fieldName, type) {
+                    var prevValue = fieldValue.get(fieldName, this.prevValues);
+                    var savedValue = fieldValue.get(fieldName, this.valuesCache);
+                    var currentValue = fieldValue.get(fieldName, this.getFieldValue(fieldName));
+
                     switch (type) {
                         case VALIDATION_ON_CHANGE:
                             if (e.type == 'blur') {
@@ -1111,12 +1133,10 @@ Forms = (function() {
                             this.validate(fieldName);
                             break;
                         case VALIDATION_ON_SUBMIT:
-                            this.getFormData(!0);
+                            fieldValue.set(fieldName, currentValue, this.options.formDataCache);
+//                            this.getFormData(!0);
                             break;
                     }
-                    var savedValue = fieldValue.get(fieldName, this.valuesCache);
-                    var currentValue = fieldValue.get(fieldName, this.getFieldValue(fieldName));
-                    var prevValue = fieldValue.get(fieldName, this.prevValues);
 
                     if (differs(savedValue, currentValue)) {
                         fieldValue.set(fieldName, !0, this.differsObj);
@@ -1127,7 +1147,6 @@ Forms = (function() {
                     this.isChanged = differs(this.differsObj, {});
 
                     if (this.isChanged != this.lastChangedStatus) {
-
                         onChangeCallback(this.isChanged, this);
                         this.lastChangedStatus = !!this.isChanged;
                     }
@@ -1275,6 +1294,9 @@ Forms = (function() {
         Form: FormFactoryConstructor,
         remove: function (id) {
             if (formsList[id]) delete formsList[id]
+        },
+        getList: function () {
+            return formsList
         },
         VALIDATION_ON_SUBMIT: VALIDATION_ON_SUBMIT,
         VALIDATION_ON_CHANGE: VALIDATION_ON_CHANGE,
