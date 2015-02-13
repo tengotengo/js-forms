@@ -349,11 +349,12 @@ Forms = (function() {
 
         return str;
     }
-    function getFieldValue(elem) {
+
+    function getElementValue(elem) {
         var name = elem.name, type = elem.type, tag = elem.tagName.toLowerCase();
 
         if (!name || elem.disabled || type == 'reset' || type == 'button' ||
-            (type == 'checkbox' || type == 'radio') && !elem.checked ||
+            type == 'radio' && !elem.checked ||
             (type == 'submit' || type == 'image') && elem.form && elem.form.clk != elem ||
             tag == 'select' && elem.selectedIndex == -1) {
             return null;
@@ -381,31 +382,29 @@ Forms = (function() {
                         a.push(v);
                     }
                 }
-                return a;
+                return a.join(',');
             case 'input':
                 switch (type) {
                     case 'radio':
                         return elem.value === '' ? null : elem.value;
                     case 'checkbox':
-                        if (!elem.hasAttribute('value')) {
-                            return 1;
-                        }
-                        return elem.value === '' ? 1 : elem.value;
+                        /* TODO test in IE */
+                        return !!elem.checked ? (elem.value || '1') : '';
+                        break;
                     case 'text':
                     case 'password':
                     case 'hidden':
-                        return elem.value === '' ? null : elem.value;
+                        return elem.value;
                         break;
                 }
                 break;
             case 'textarea':
-                return elem.value === '' ? null : elem.value;
+                return elem.value;
             default:
                 return null
         }
     }
-    /* deprecating */
-    function formToArray(formContainer, emptyFields) {
+    function formToArray(formContainer) {
         var result = {};
 
         if (!formContainer.length) {
@@ -419,19 +418,19 @@ Forms = (function() {
                 continue;
             }
 
-            var value = getFieldValue(element);
+            var value = getElementValue(element);
 
-            if (emptyFields && fieldValue.get(name, result) === undefined && value === null) {
+            if (fieldValue.get(name, result) === undefined && value === null) {
                 fieldValue.set(name, null, result);
             }
 
-            if (value === null || !emptyFields && ( value === '' || value === null || value === undefined )) continue;
+            if (value === null) continue;
 
             if (element.hasAttribute('bitmask')) {
                 value = parseInt(value, 10) || 0;
-                if (value !== 0 || emptyFields) {
-                    result[name] |= value;
-                }
+
+                value |= fieldValue.get(name, result);
+                fieldValue.set(name, value, result);
                 continue;
             }
 
@@ -441,7 +440,6 @@ Forms = (function() {
         return result;
     }
 
-    /* legit method */
     function setFieldValue(elem, value) {
         if (!elem) return;
 
@@ -483,13 +481,8 @@ Forms = (function() {
                         case 'password':
                         case 'hidden':
                         case 'text':
-                            if (typeof val == 'object') {
-                                el.setAttribute('value', val);
-                                el.value = val;
-                            } else {
-                                el.setAttribute('value', val);
-                                el.value = val;
-                            }
+                            el.setAttribute('value', (val === null ? '' : val));
+                            el.value = val === null ? '' : val;
                             break;
                         case 'checkbox':
                             var isBitmask = el.hasAttribute('bitmask');
@@ -527,7 +520,17 @@ Forms = (function() {
         setValue(elem, value);
     }
 
-    function fireEvent(obj, evt) {
+    function setFieldValueByName(form, name, value) {
+        if (!form.elements[name]) return;
+        setFieldValue(form.elements[name], value);
+        fieldValue.set(name, value, form.currentData);
+    }
+    function getFieldValueByName(form, name) {
+        if (!form.elements[name]) return void 0;
+        return fieldValue.get(name, formToArray(Array.prototype.concat(form.elements[name])))
+    }
+
+    /*function fireEvent(obj, evt) {
         if (obj === undefined) return;
         var evObj;
         if (document.createEvent) {
@@ -545,7 +548,7 @@ Forms = (function() {
             }
             obj.fireEvent('on' + evt, evObj);
         }
-    }
+    }*/
 
     function getStandartValidationMethod(method) {
         if (!defaultValidationMethods[method]) {
@@ -755,7 +758,7 @@ Forms = (function() {
                     var valueToSet = data[key] === null ? '' : data[key];
 
                     if (type == 'select') {
-                        if (i !== 0) {
+                        if (i !== 0 && data[''] === undefined) {
                             tmpElement = '<option value=""></option>';
                             elementsData.push({input: tmpElement});
                             i = 0;
@@ -882,7 +885,6 @@ Forms = (function() {
                                 addClass(form.elements[fieldName], errorClass);
                             }
                             valid = !1;
-                            console.log(fieldName, 'is not valid');
                             break;
                         } else {
                             if (form.notificationContainers[FIELD_TYPE_ERROR][fieldName]) {
@@ -979,8 +981,6 @@ Forms = (function() {
 
         function Form(conf) {
             var opt = {
-                    cache: null,
-                    formDataCache: null,
                     config: null,
                     defaults: defaults,
                     initialized: !1,
@@ -1012,15 +1012,9 @@ Forms = (function() {
             };
 
             form.isChanged = !1;
-
             form.currentData = {}; /* always current data from all the fields */
             form.initialData = {}; /* cloned formData after the initialization. Every save clones it again */
             form.differsObj = {}; /* mark here fieldNames which have changed (if differs current value and saved value) */
-
-            form.prevValues = {};
-            form.valuesCache = {};
-            form.lastChangedStatus = !1; /* not sure if it needed */
-
             form.config = opt.config;
             form.options = opt;
             form.defaults = defaults;
@@ -1048,18 +1042,9 @@ Forms = (function() {
                 opt.config[PARAM_VALIDATION_TYPE] = defaults.validationType;
             }
 
-            console.log('opt.config[PARAM_FLAGS]', opt.config[PARAM_FLAGS]);
-
             var emptyFields = !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY);
-            form.getFormData = function (renewCache) {
+            form.getFormData = function () {
                 return form.currentData;
-
-                /*if (opt.formDataCache && !form.isChanged && !renewCache) {
-                    *//* TODO rethink how to make it without cloning an object, feels wrong *//*
-                    return cloneObject(opt.formDataCache);
-                }
-                opt.formDataCache = formToArray(form.container, emptyFields);
-                return opt.formDataCache;*/
             };
 
             if (opt.config[PARAM_ACTION]) {
@@ -1068,37 +1053,28 @@ Forms = (function() {
 
             form.action = opt.container.getAttribute('action');
 
-            form.setFieldValue = function(name, value, fireCb) {
-                fireCb = fireCb || false;
-
-
-            };
-            form.setFieldValues = function(arr, fireCb) {
-                fireCb = fireCb || false;
-
-
+            /* TODO check usages */
+            form.getFieldValue = function(name) {
+                return getFieldValueByName(form, name);
             };
 
-            /* deprecating */
-            form.setField = function (name, value) {
-                if (!form.elements[name]) return;
-                setFieldValue(form.elements[name], value);
-                fireEvent(form.elements[name], 'formChange');
+            form.setField = function(name, value, fireCb) {
+                setFieldValueByName(form, name, value);
+                if (fireCb && onFieldChange) {
+                    onFieldChange(name, value)
+                }
             };
-            /* deprecating */
-            form.setFields = function (arr) {
-                for (var i in arr) {
-                    if (!Object.prototype.hasOwnProperty.call(arr, i)) {
+            form.setFields = function(arr, fireCb) {
+                for (var name in arr) {
+                    if (!Object.prototype.hasOwnProperty.call(arr, name)) {
                         continue;
                     }
-                    if (!form.elements[i]) continue;
-
-                    setFieldValue(form.elements[i], arr[i]);
-                    fireEvent(form.elements[i], 'formChange');
+                    form.setField(name, arr[name], fireCb);
                 }
-
-                form.getFormData(!0);
             };
+
+            /* TODO check usages */
+
             form.getField = function (name) {
                 return form.elements[name];
             };
@@ -1133,6 +1109,8 @@ Forms = (function() {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name, defaults.warningClass)
             };
 
+            var onFieldChange = opt.config[PARAM_ON_FIELD_CHANGE] || false;
+
             /*
             * setting default values
             * setting values from data
@@ -1144,8 +1122,7 @@ Forms = (function() {
                 var fieldsArr = opt.config[PARAM_FIELDS] || {};
                 var data = opt.config[PARAM_DATA];
                 var validationType = opt.config[PARAM_VALIDATION_TYPE];
-                var onChangeCallback = this.config[PARAM_ON_CHANGE] || defaults.onChange;
-                var onFieldChange = this.config[PARAM_ON_FIELD_CHANGE] || function (a, b) { console.log('fieldChange fired', arguments )};
+                var onChangeCallback = opt.config[PARAM_ON_CHANGE] || defaults.onChange;
 
                 var onChange = function (e, fieldName, type) {
                     /* "this" is a form object */
@@ -1168,12 +1145,12 @@ Forms = (function() {
 
                     if (differs(oldValue, newValue)) {
                         fieldValue.set(fieldName, newValue, this.currentData);
-                        onFieldChange(fieldName, newValue);
+                        if (onFieldChange) onFieldChange(fieldName, newValue);
                     }
 
                     var beforeChange = differs(this.differsObj, {});
 
-                    if (differs(initialValue, newValue)) {
+                    if (differs(initialValue, newValue, !0)) {
                         fieldValue.set(fieldName, !0, this.differsObj);
                     } else {
                         fieldValue.del(fieldName, this.differsObj);
@@ -1185,8 +1162,6 @@ Forms = (function() {
                         this.isChanged = afterChange;
                         onChangeCallback(afterChange, this);
                     }
-
-                    console.log(newValue, initialValue);
                 };
 
                 elementsProcess.call(form, function (elem) {
@@ -1210,10 +1185,11 @@ Forms = (function() {
                     var name = elem.name;
                     var value = fieldValue.get(name, data);
 
+
                     if (fieldsArr[name]) {
                         /* setting default values */
                         if (value === undefined) {
-                            value = fieldsArr[name]['defaultVal'] !== undefined ? fieldsArr[name]['defaultVal'] : null;
+                            value = fieldsArr[name]['defaultVal'] !== undefined ? fieldsArr[name]['defaultVal'] : '';
                         }
 
                         /* insert classes and other attributes, validation */
@@ -1254,13 +1230,10 @@ Forms = (function() {
                         }
                     }
                     /* data from initialization, including null values */
-                    if (value !== undefined/* && value !== null*/) {
+                    if (value !== undefined) {
                         setFieldValue(elem, value);
                         fieldValue.set(name, value, form.currentData);
-                    }/* else {
-                        fieldValue.set(name, null, form.currentData);
-                    }*/
-
+                    }
                     /* bind change events */
                     if (!elem.initialized) {
                         var eventFunc = function (n) {
@@ -1291,20 +1264,25 @@ Forms = (function() {
                 form.isChanged = !1;
             };
 
-            form.resetToDefaults = function() {
+            form.resetToDefaults = function(fireCb) {
                 var fieldsList = opt.config[PARAM_FIELDS] || {};
                 elementsProcess.call(form, function (elem) {
-                    if (fieldsList[elem.name] && fieldsList[elem.name]['defaultVal'] !== undefined) {
-                        setFieldValue(elem, fieldsList[elem.name]['defaultVal']);
-                        fieldValue.set(elem.name, fieldsList[elem.name]['defaultVal'], form.prevValues);
+                    if (!fieldsList[elem.name]) {
+                        return
+                    }
+                    var val = fieldsList[elem.name]['defaultVal'];
+                    if (fieldsList[elem.name] && val !== undefined) {
+                        setFieldValue(elem, val);
+                        fieldValue.set(elem.name, val, form.currentData);
+                        if (fireCb && onFieldChange) {
+                            onFieldChange(elem.name, val)
+                        }
                     }
                 });
             };
 
             /* before inserting, let's read all the existing fields into form.currentData  */
-            form.currentData = formToArray(form.container, !!(opt.config[PARAM_FLAGS] & FLAG_SUBMIT_EMPTY));
-
-            console.log('initial form data', form.currentData);
+            form.currentData = formToArray(form.container);
 
             /* inserting field into wrappers */
             insertFields(
@@ -1313,29 +1291,16 @@ Forms = (function() {
                 !!(opt.config[PARAM_FLAGS] & FLAG_UNIQUE_LABELS),
                 !!(opt.config[PARAM_FLAGS] & FLAG_DEBUG)
             );
-
-            /* TODO check usages */
-            form.getFieldValue = function(name) {
-                if (!form.elements[name]) return void 0;
-                return fieldValue.get(name, formToArray(Array.prototype.concat(form.elements[name]), emptyFields))
-            };
-
-            console.log('initInputs');
             form.initInputs();
 
             if (opt.config[PARAM_ON_INIT]) {
                 opt.config[PARAM_ON_INIT](form);
             }
-
-            console.log('binding Form submit event', form.currentData);
             bindFormEvents(form);
-
-            console.log('saveChanges');
             /* stores current changes */
             form.saveChanges();
 
             if (opt.config[PARAM_VALIDATION_TYPE] === VALIDATION_ON_KEYUP) {
-                console.log('form.validate');
                 form.validate();
             }
 
