@@ -1143,7 +1143,7 @@ Forms = (function() {
                             break;
                     }
 
-                    if (differs(oldValue, newValue)) {
+                    if (differs(oldValue, newValue, !0)) {
                         fieldValue.set(fieldName, newValue, this.currentData);
                         if (onFieldChange) onFieldChange(fieldName, newValue);
                     }
@@ -1281,6 +1281,10 @@ Forms = (function() {
                 });
             };
 
+            form.getAllValues = function() {
+                return formToArray(form.container)
+            };
+
             /* before inserting, let's read all the existing fields into form.currentData  */
             form.currentData = formToArray(form.container);
 
@@ -1291,14 +1295,22 @@ Forms = (function() {
                 !!(opt.config[PARAM_FLAGS] & FLAG_UNIQUE_LABELS),
                 !!(opt.config[PARAM_FLAGS] & FLAG_DEBUG)
             );
+
             form.initInputs();
 
             if (opt.config[PARAM_ON_INIT]) {
                 opt.config[PARAM_ON_INIT](form);
             }
+
             bindFormEvents(form);
+
             /* stores current changes */
             form.saveChanges();
+
+            form.refresh = function() {
+                form.currentData = formToArray(form.container);
+                form.saveChanges();
+            };
 
             if (opt.config[PARAM_VALIDATION_TYPE] === VALIDATION_ON_KEYUP) {
                 form.validate();
