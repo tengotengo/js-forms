@@ -49,11 +49,13 @@ Forms = (function() {
         PARAM_VALIDATE = 'validate', /* replaces standard form.validate() and passes form, form[PARAM_CURRENT_DATA]. */
         PARAM_VALIDATION_METHODS = 'validation', /* parameter for passing new validation methods */
         PARAM_DATA = 'data',
+        PARAM_DEFAULT_DATA = 'defaultData',
         PARAM_CURRENT_DATA = 'currentData',
         PARAM_INITIAL_DATA = 'initialData',
         PARAM_DIFFERS_OBJ = 'differsObj',
         PARAM_CONFIG = 'config',
         PARAM_CONTAINER = 'container',
+        PARAM_ELEMENTS = 'elements',
         PARAM_FIELD_CONTAINER = 'fieldContainers',
         PARAM_PARAMS = 'params',
         PARAM_DEFAULTS = 'defaults',
@@ -103,7 +105,7 @@ Forms = (function() {
         text: '',
         textarea: '',
         radio: null,
-        checkbox: ''
+        checkbox: null
     };
 
     var defaultValidationMethods = {
@@ -274,9 +276,137 @@ Forms = (function() {
     function error() {
         throw new Error(Array[PARAM_PROTOTYPE].slice.call(arguments).join(', '))
     }
+
+    function objEach(o, callback) {
+        for (var i in o) {
+            if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(o, i)) {
+                continue;
+            }
+            if (callback(i, o[i]) === false) {
+                break;
+            }
+        }
+    }
+
     function warning() {
         console.log(Array[PARAM_PROTOTYPE].slice.call(arguments).join(', '))
     }
+    function onChange(e, fieldName, type) {
+        /* "this" is a form object */
+        var oldValue = fieldValue.get(fieldName, this[PARAM_CURRENT_DATA]);
+        var newValue = this.getFieldValue(fieldName);
+        var initialValue = fieldValue.get(fieldName, this[PARAM_INITIAL_DATA]);
+        var onChangeCallback = this[PARAM_CONFIG][PARAM_ON_CHANGE] || this[PARAM_DEFAULTS][PARAM_ON_CHANGE];
+        var onFieldChange = this[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
+
+        if (differs(oldValue, newValue, !0)) {
+            fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA]);
+
+            switch (type) {
+                case VALIDATION_ON_CHANGE:
+                case VALIDATION_ASAP:
+                    this[PARAM_VALIDATE](fieldName);
+                    break;
+                case VALIDATION_ON_SUBMIT:
+                    break;
+            }
+
+            if (onFieldChange) onFieldChange(fieldName, newValue, this);
+        }
+
+        var beforeChange = differs(this[PARAM_DIFFERS_OBJ], {});
+
+        if (differs(initialValue, newValue, !0)) {
+            fieldValue.set(fieldName, !0, this[PARAM_DIFFERS_OBJ]);
+        } else {
+            fieldValue.del(fieldName, this[PARAM_DIFFERS_OBJ]);
+        }
+
+        var afterChange = differs(this[PARAM_DIFFERS_OBJ], {});
+
+        if (beforeChange != afterChange) {
+            this[PARAM_IS_CHANGED] = afterChange;
+            onChangeCallback(afterChange, this);
+        }
+    }
+    function processElement(form, elem) {
+        var name = elem.name;
+        var validationType = form[PARAM_CONFIG][PARAM_VALIDATION_TYPE];
+
+        /* selects here too */
+        if (elem.hasAttribute === undefined) {
+            elem.hasAttribute = function (attrName) {
+                return typeof this[attrName] !== 'undefined';
+            }
+        }
+
+        (function() {
+            if (elem.type && (elem.type == 'hidden' || elem.type == 'disabled')) {
+                return;
+            }
+
+            elem.setAttribute('tabindex', ++globalTabIndex);
+            elem.formIndex = elem.formIndex || globalTabIndex;
+        })();
+
+        if (form[PARAM_CONFIG][PARAM_FIELDS][name]) {
+            /* insert classes and other attributes, validation */
+            objEach(form[PARAM_CONFIG][PARAM_FIELDS][name], function(paramName, valName) {
+                var attrArr = null;
+
+                switch (paramName) {
+                    case DATA_TYPE_DISABLED:
+                    case DATA_TYPE_BITMASK:
+                        if (elem[PARAM_LENGTH]) {
+                            for (var i = 0, subElem; subElem = elem[i]; i++) {
+                                subElem.setAttribute(paramName, '1');
+                            }
+                        } else {
+                            elem.setAttribute(paramName, '1');
+                        }
+                        break;
+                    case DATA_TYPE_ATTRIBUTES:
+                        attrArr = valName;
+                        objEach(attrArr, function(attr, attrArrAttr) {
+                            elem.setAttribute(attr, attrArrAttr)
+                        });
+                        break;
+                    case DATA_TYPE_CLASS:
+                        attrArr = valName;
+
+                        if (typeof attrArr == 'string') {
+                            addClass(elem, attrArr);
+                        } else {
+                            try {
+                                for (var i = 0; i < attrArr[PARAM_LENGTH]; i++) {
+                                    addClass(elem, attrArr[i]);
+                                }
+                            } catch (e) {}
+                        }
+                        break;
+                }
+            });
+        }
+
+        if (!elem[PARAM_INITIALIZED]) {
+            var eventFunc = function (n) {
+                return function (e) {
+                    onChange.call(this, e, n, validationType)
+                }.bind(this)
+            }.call(form, elem.name);
+
+            bind(elem, 'blur', eventFunc);
+            bind(elem, 'click', eventFunc);
+            bind(elem, 'keyup', eventFunc);
+            bind(elem, 'contextmenu', function(e) {
+                form[PARAM_DEFAULTS][PARAM_FIELD_CONTEXT](e, elem, form)
+            });
+
+            elem[PARAM_INITIALIZED] = !0;
+        }
+    }
+
+
     function bindFormEvents(form) {
         if (!(form[PARAM_CONFIG][PARAM_FLAGS] & FLAG_ASYNC)) {
             /* if not async */
@@ -299,9 +429,9 @@ Forms = (function() {
 
                     /* adding params */
                     if (form[PARAM_CONFIG][PARAM_PARAMS]) {
-                        for (var i in form[PARAM_CONFIG][PARAM_PARAMS]) {
-                            fieldValue.set(i, form[PARAM_CONFIG][PARAM_PARAMS][i], form[PARAM_CURRENT_DATA]);
-                        }
+                        objEach(form[PARAM_CONFIG][PARAM_PARAMS], function(i, paramI) {
+                            fieldValue.set(i, paramI, form[PARAM_CURRENT_DATA]);
+                        });
                     }
 
                     form[PARAM_DEFAULTS][PARAM_AJAX_FUNCTION](form.action, "POST", form[PARAM_CURRENT_DATA], (function (cb) {
@@ -315,9 +445,12 @@ Forms = (function() {
                 };
 
             beforeSubmit(function () {
-                form[PARAM_CURRENT_DATA] = formToArray(form[PARAM_CONTAINER]);
+                var allValues = form.getAllValues();
+
+                form[PARAM_CURRENT_DATA] = allValues;
 
                 var validationResult = form[PARAM_VALIDATE]();
+
                 validateCallback(validationResult, function() {
                     onSubmit(callback);
                     afterSubmit()
@@ -332,6 +465,9 @@ Forms = (function() {
             submit();
             e.returnValue = !1;
             return !1;
+        });
+        bind(form[PARAM_CONTAINER], 'contextmenu', function(e) {
+            form[PARAM_DEFAULTS][PARAM_FORM_CONTEXT](e, form)
         });
     }
     function generateElement(type, name, id, elements) {
@@ -410,7 +546,7 @@ Forms = (function() {
                         return elem.value === '' ? defaultValues.radio : elem.value;
                     case 'checkbox':
                         /* TODO test in IE */
-                        return !!elem.checked ? (elem.value || '1') : defaultValues.checkbox;
+                        return !!elem.checked ? (elem.value || '1') : defaultValues.checkbox /* TODO I think should be null */;
                         break;
                     case 'text':
                     case 'password':
@@ -425,6 +561,7 @@ Forms = (function() {
                 return null
         }
     }
+    /* works */
     function formToArray(formContainer) {
         var result = {};
 
@@ -440,20 +577,18 @@ Forms = (function() {
             }
 
             var value = getElementValue(element);
+            var existing = fieldValue.get(name, result);
 
-            if (fieldValue.get(name, result) === undefined && value === null) {
+            /* если значение еще не существует, и значение элемента null */
+            if (existing === undefined && value === null) {
                 fieldValue.set(name, null, result);
             }
 
             if (value === null) continue;
 
-
             if (element.hasAttribute('bitmask')) {
                 value = parseInt(value, 10) || 0;
-
-                value |= fieldValue.get(name, result);
-                fieldValue.set(name, value, result);
-                continue;
+                value |= parseInt(existing, 10) || 0;
             }
 
             fieldValue.set(name, value, result);
@@ -461,6 +596,7 @@ Forms = (function() {
 
         return result;
     }
+    /* works very well */
     function setFieldValue(elem, value) {
         if (!elem) return false;
 
@@ -525,7 +661,6 @@ Forms = (function() {
         /* TODO test more. In case if field name is xxx[] array */
         if (typeof value == 'object' && elem[PARAM_LENGTH] && value !== null) {
             for (var i = 0, el; el = elem[i]; i++) {
-                /*setValue(el, (value !== null && value[i]) ? value[i] : null);*/
                 if (setValue(el, value)) {
                     result = !0;
                 }
@@ -533,7 +668,7 @@ Forms = (function() {
             return result;
         }
 
-        /* if array of elements, like bitmask */
+        /* if array of elements, like bitmask, where elements have same name, but not select */
         if (elem[PARAM_LENGTH] && !elem.tagName) {
             for (var i = 0, el; el = elem[i]; i++) {
                 if (setValue(el, value)) {
@@ -549,19 +684,23 @@ Forms = (function() {
         return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Array]'
     }
     function setFieldValueByName(form, name, value) {
-        if (!form.elements[name]) return;
-        var setResult = setFieldValue(form.elements[name], value);
+        if (!form[PARAM_ELEMENTS][name]) return;
+
+        var setResult = setFieldValue(form[PARAM_ELEMENTS][name], value);
+
+        var elem = isArray(form[PARAM_ELEMENTS][name]) ? form[PARAM_ELEMENTS][name][0] : form[PARAM_ELEMENTS][name];
+
         if (!setResult) {
-            value = defaultValues[form.elements[name].type || form.elements[name].tagName];
+            value = defaultValues[(elem.type || elem.tagName).toLowerCase()];
         }
-        var elem = isArray(form.elements[name]) ? form.elements[name][0] : form.elements[name];
+
         if (!isElementDisabled(elem)) {
             fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
         }
     }
     function getFieldValueByName(form, name) {
-        if (!form.elements[name]) return void 0;
-        return fieldValue.get(name, formToArray(Array[PARAM_PROTOTYPE].concat(form.elements[name])))
+        if (!form[PARAM_ELEMENTS][name]) return void 0;
+        return fieldValue.get(name, formToArray(Array[PARAM_PROTOTYPE].concat(form[PARAM_ELEMENTS][name])))
     }
     function getStandartValidationMethod(method) {
         if (!defaultValidationMethods[method]) {
@@ -582,34 +721,8 @@ Forms = (function() {
             return b == c ? c : ''
         })
     }
-    function elementsProcess(callback) {
-        var setElements = !this.elements;
-        if (setElements) {
-            this.elements = {};
-        }
-
-        for (var i = 0, elem; elem = this[PARAM_CONTAINER][i]; i++) {
-            if (setElements) {
-                if (this.elements[elem.name]) {
-                    if (isArray(this.elements[elem.name])) {
-                        this.elements[elem.name].push(elem);
-                    } else {
-                        this.elements[elem.name] = Array[PARAM_PROTOTYPE].concat(this.elements[elem.name], elem);
-                    }
-                } else {
-                    this.elements[elem.name] = elem;
-                }
-            }
-            callback(elem);
-        }
-    }
     function isElementDisabled(elem) {
         return !!((elem.type && elem.type == 'disabled') || elem.disabled || elem.getAttribute('disabled'))
-    }
-    function clear() {
-        elementsProcess.call(this, function (el) {
-            this.setField(el.name, '')
-        }.bind(this))
     }
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
@@ -692,179 +805,84 @@ Forms = (function() {
 
         return result[0] ? result : null;
     }
-    function setDefaultValuesToFields(form, initialData, reset) {
-        var fieldsArr = form[PARAM_CONFIG][PARAM_FIELDS] || {};
-        var validationType = form[PARAM_CONFIG][PARAM_VALIDATION_TYPE];
-        var onChangeCallback = form[PARAM_CONFIG][PARAM_ON_CHANGE] || form[PARAM_DEFAULTS][PARAM_ON_CHANGE];
-        reset = reset || false;
+    function setFormData(form, initialData, fireFieldChangeCallback) {
+        fireFieldChangeCallback = fireFieldChangeCallback || false;
 
-        var onFieldChange = form[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
-
-        var onChange = function (e, fieldName, type) {
-            /* "this" is a form object */
-            var oldValue = fieldValue.get(fieldName, this[PARAM_CURRENT_DATA]);
-            var newValue = form.getFieldValue(fieldName);
-            var initialValue = fieldValue.get(fieldName, this[PARAM_INITIAL_DATA]);
-
-            if (differs(oldValue, newValue, !0)) {
-                fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA]);
-
-                switch (type) {
-                    case VALIDATION_ON_CHANGE:
-                    case VALIDATION_ASAP:
-                        this[PARAM_VALIDATE](fieldName);
-                        break;
-                    case VALIDATION_ON_SUBMIT:
-                        break;
-                }
-
-                if (onFieldChange) onFieldChange(fieldName, newValue);
-            }
-
-            var beforeChange = differs(this[PARAM_DIFFERS_OBJ], {});
-
-            if (differs(initialValue, newValue, !0)) {
-                fieldValue.set(fieldName, !0, this[PARAM_DIFFERS_OBJ]);
-            } else {
-                fieldValue.del(fieldName, this[PARAM_DIFFERS_OBJ]);
-            }
-
-            var afterChange = differs(this[PARAM_DIFFERS_OBJ], {});
-
-            if (beforeChange != afterChange) {
-                this[PARAM_IS_CHANGED] = afterChange;
-                onChangeCallback(afterChange, this);
-            }
-        };
-
-        var processElement = function(elem) {
-            var name = elem.name;
-
-            /* selects here too */
-            if (elem.hasAttribute === undefined) {
-                elem.hasAttribute = function (attrName) {
-                    return typeof this[attrName] !== 'undefined';
-                }
-            }
-
-            (function() {
-                if (elem.type && (elem.type == 'hidden' || elem.type == 'disabled')) {
-                    return;
-                }
-
-                elem.setAttribute('tabindex', ++globalTabIndex);
-                elem.formIndex = elem.formIndex || globalTabIndex;
-            })();
-
-            if (fieldsArr[name]) {
-                /* insert classes and other attributes, validation */
-                for (var paramName in fieldsArr[name]) {
-                    var attrArr = null;
-
-                    switch (paramName) {
-                        case DATA_TYPE_DISABLED:
-                        case DATA_TYPE_BITMASK:
-                            if (elem[PARAM_LENGTH]) {
-                                for (var i = 0, subElem; subElem = elem[i]; i++) {
-                                    subElem.setAttribute(paramName, '1');
-                                }
-                            } else {
-                                elem.setAttribute(paramName, '1');
-                            }
-                            break;
-                        case DATA_TYPE_ATTRIBUTES:
-                            attrArr = fieldsArr[name][paramName];
-                            for (var attr in attrArr) {
-                                elem.setAttribute(attr, attrArr[attr])
-                            }
-                            break;
-                        case DATA_TYPE_CLASS:
-                            attrArr = fieldsArr[name][paramName];
-
-                            if (typeof attrArr == 'string') {
-                                addClass(elem, attrArr);
-                            } else {
-                                try {
-                                    for (var i = 0; i < attrArr[PARAM_LENGTH]; i++) {
-                                        addClass(elem, attrArr[i]);
-                                    }
-                                } catch (e) {}
-                            }
-                            break;
-                    }
-                }
-            }
-
-            if (!elem[PARAM_INITIALIZED]) {
-                var eventFunc = function (n) {
-                    return function (e) {
-                        onChange.call(this, e, n, validationType)
-                    }.bind(this)
-                }.call(form, elem.name);
-
-                bind(elem, 'blur', eventFunc);
-                bind(elem, 'click', eventFunc);
-                bind(elem, 'keyup', eventFunc);
-
-                elem[PARAM_INITIALIZED] = !0;
-            }
-        };
-
-        for (var name in form.elements) {
-            var elem = form.elements[name];
-            var value = fieldValue.get(name, initialData);
+        objEach(form[PARAM_ELEMENTS], function(name, elem) {
+            /* elem here can be an array of elements */
 
             var setData = function(elem, elemSample) {
-                var defValue = !1;
-
+                var fieldsArr = form[PARAM_CONFIG][PARAM_FIELDS];
+                var inputValue = fieldValue.get(name, initialData);
                 var notEmpty = fieldsArr[name] ? !!fieldsArr[name][DATA_TYPE_NOT_EMPTY] : false;
+                var defaultValue = defaultValues[(elemSample.type || elemSample.tagName).toLowerCase()];
+                var isDefaultFieldVal = false;
+                var valueCame = inputValue !== undefined;
 
-                /* if initialData didn't come */
-                if (value === undefined) {
-                    /* any default values ? */
+                if (inputValue === undefined) {
+                    /* if initialData didn't come, значит одно из двух: */
+                    isDefaultFieldVal = true;
+                    /* иначе остается значение по-умолчанию */
+                    inputValue = defaultValue;
 
-                    if (fieldsArr[name] && fieldsArr[name][DATA_TYPE_DEFAULT_VAL] !== undefined) {
-                        value = fieldsArr[name][DATA_TYPE_DEFAULT_VAL];
-                    } else if (fieldsArr[name] && fieldsArr[name][DATA_TYPE_DATA] && notEmpty) {
-                        for (var i in fieldsArr[name][DATA_TYPE_DATA]) {
-                            if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(fieldsArr[name][DATA_TYPE_DATA], i)) {
-                                continue;
-                            }
-                            value = fieldsArr[name][DATA_TYPE_DATA][i];
-                            break;
+                    if (fieldsArr[name]) {
+                        /* если есть в конфиге */
+
+                        if (fieldsArr[name][DATA_TYPE_DEFAULT_VAL] !== undefined) {
+                            /* если есть значение по-умолчанию */
+                            inputValue = fieldsArr[name][DATA_TYPE_DEFAULT_VAL];
+                            isDefaultFieldVal = false;
+                        } else if (fieldsArr[name][DATA_TYPE_DATA] && notEmpty) {
+                            /* если есть data и значение не должно быть пустым */
+
+                            objEach(fieldsArr[name][DATA_TYPE_DATA], function(i, val) {
+                                inputValue = val;
+                                isDefaultFieldVal = false;
+                                return false
+                            });
                         }
-                    } else {
-                        defValue = !0;
-                        value = defaultValues[elemSample.type || elemSample.tagName]
                     }
                 }
-
-                if (defValue && isElementDisabled(elemSample)) {
+                if (isDefaultFieldVal && isElementDisabled(elemSample)) {
+                    /* if it's a disabled element we don't need to set it to PARAM_CURRENT_DATA */
+                    /* however we will set the field value if it's not default (null) */
                     return;
                 }
-                if (fieldValue.get(name, form[PARAM_CURRENT_DATA]) !== undefined) {
+                /* if input was already in the form then we have the value in PARAM_CURRENT_DATA and no need to set it */
+                if (!valueCame && fieldValue.get(name, form[PARAM_CURRENT_DATA]) !== undefined) {
                     return;
                 }
 
-                var setResult;
-
-                setResult = setFieldValue(elem, value);
+                /* setting the value in the field */
+                var setResult = setFieldValue(elem, inputValue);
 
                 if (!setResult) {
-                    value = defaultValues[elemSample.type || elemSample.tagName]
+                    /* если не удалось установить такое значение, значит опять по-умолчанию */
+                    inputValue = defaultValue;
                 }
 
-                fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
+                if (!isElementDisabled(elemSample)) {
+                    if (fireFieldChangeCallback) {
+                        onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
+                    }
+
+                    if (!valueCame || inputValue === defaultValue) {
+                        fieldValue.set(name, inputValue, form[PARAM_DEFAULT_DATA]);
+                    }
+                    fieldValue.set(name, inputValue, form[PARAM_CURRENT_DATA]);
+                }
             };
 
             if (isArray(elem)) {
-                if (!reset) for (var i = 0, el; el = elem[i]; i++) processElement(el);
+                for (var i = 0, el; el = elem[i]; i++) {
+                    processElement(form, el);
+                }
                 setData(elem, elem[0]);
             } else {
-                if (!reset) processElement(elem);
+                processElement(form, elem);
                 setData(elem, elem);
             }
-        }
+        });
     }
     function insertFields(form, fieldsList, debugMode) {
         debugMode = debugMode || !1;
@@ -882,16 +900,14 @@ Forms = (function() {
             return label
         };
 
-        for (var name in fieldsList) {
-            var fieldName = name + '';
-            var fieldData = fieldsList[fieldName];
+        objEach(fieldsList, function(fieldName, fieldData) {
             var fieldType = fieldData[DATA_TYPE_TYPE];
 
-            if (!fieldType) continue;
+            if (!fieldType) return;
 
             form[PARAM_FIELD_CONTAINER][fieldName] = findElementByNameAndType(container, fieldName, FIELD_TYPE_CONTAINER);
 
-            if (!form[PARAM_FIELD_CONTAINER][fieldName]) continue;
+            if (!form[PARAM_FIELD_CONTAINER][fieldName]) return;
 
             /* cleaning inner content */
             form[PARAM_FIELD_CONTAINER][fieldName][PARAM_INNER_HTML] = '';
@@ -916,6 +932,7 @@ Forms = (function() {
 
             var fieldId;
 
+            /* TODO не вылядит хорошо, переписать */
             var dataArr = {};
             if (fieldData['data']) {
                 dataArr = fieldData['data'];
@@ -927,31 +944,26 @@ Forms = (function() {
                 }
             }
 
-            var notEmpty = !!fieldData[DATA_TYPE_NOT_EMPTY];
-
-            form[PARAM_FIELD_CONTAINER][fieldName][PARAM_INNER_HTML] = (function (data, id, type, name, isLabel/*, notEmpty*/) {
+            form[PARAM_FIELD_CONTAINER][fieldName][PARAM_INNER_HTML] = (function (data, id, type, name, isLabel) {
                 /* creating an html to insert into fieldContainer */
                 var elementsData = [];
 
                 var elementIndex = 1;
 
                 var length = 0;
-                for (var i in data) length++;
+                objEach(data, function() {
+                    length++
+                });
 
                 var isMultiple = length >= 2;
 
-                for (var key in data) {
+                objEach(data, function(key, dataKey) {
                     var elementId = id + (isMultiple ? '-' + elementIndex : '');
                     var tmpElement, dataToPush = {};
 
-                    var valueToSet = data[key] === null ? '' : data[key];
+                    var valueToSet = dataKey === null ? '' : dataKey;
 
                     if (type == 'select') {
-                        /*if (!notEmpty && i !== 0 && data[''] === undefined) {
-                            tmpElement = '<option value=""></option>';
-                            elementsData.push({input: tmpElement});
-                            i = 0;
-                        }*/
                         tmpElement = '<option value="' + valueToSet + '">' + key + '</option>';
                     } else {
                         if (type == 'text' || type == 'hidden' || type == 'password' || type == 'checkbox' || type == 'radio') {
@@ -966,15 +978,15 @@ Forms = (function() {
 
                     elementsData.push(dataToPush);
                     elementIndex++;
-                }
+                });
 
                 /* what's faster to generate text element and then acces it to bind stuff? or create element here, bind everything and append to the wrapper? */
                 var str = generateElement(type, name, id, elementsData);
 
                 return str ? str : elementsData[0]['input'];
 
-            })(dataArr, fieldId, fieldType, fieldName, !!labelContainer/*, notEmpty*/);
-        }
+            })(dataArr, fieldId, fieldType, fieldName, !!labelContainer);
+        });
     }
 
     /* IE8 fix */
@@ -1014,16 +1026,16 @@ Forms = (function() {
         };
         defaults[PARAM_ON_CHANGE] = def[PARAM_ON_CHANGE] || function (a, b) {};
         defaults[PARAM_FORM_CONTEXT] = def[PARAM_FORM_CONTEXT] || function (a) {};
-        defaults[PARAM_FIELD_CONTEXT] = def[PARAM_FIELD_CONTEXT] || function (a) {};
+        defaults[PARAM_FIELD_CONTEXT] = def[PARAM_FIELD_CONTEXT] || function () {};
         defaults[PARAM_WARNING_CLASS] = def[PARAM_WARNING_CLASS] || 'warning';
         defaults[PARAM_ON_VALIDATE] = def[PARAM_ON_VALIDATE] || function (a, b) {
             var isValid = !0;
 
-            for (var i in a) {
-                if (a[i] != true) {
+            objEach(a, function(i, ai) {
+                if (ai != true) {
                     isValid = !1
                 }
-            }
+            });
 
             if (isValid) {
                 b();
@@ -1068,39 +1080,35 @@ Forms = (function() {
                             form.getErrorContainer(fieldName)
                         );
                     }
-                    if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                        removeClass(form.elements[fieldName], errorClass);
+                    if (form[PARAM_ELEMENTS][fieldName] && form[PARAM_ELEMENTS][fieldName].name !== undefined) {
+                        removeClass(form[PARAM_ELEMENTS][fieldName], errorClass);
                     }
 
-                    for (var type in params[DATA_TYPE_VALIDATE]) {
-                        if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(params[DATA_TYPE_VALIDATE], type)) {
-                            continue;
-                        }
-
+                    objEach(params[DATA_TYPE_VALIDATE], function(type, val) {
                         /* custom methods overwrite standard onse */
                         var validationMethod = validate.methods[type] || getStandartValidationMethod(type);
 
-                        if (!validationMethod) continue;
+                        if (!validationMethod) return;
 
                         if (type == 'required' || (value != '' && value !== null && typeof value != 'undefined')) {
                             fieldValid = validationMethod[VALIDATION_KEY_TEST](
                                 value,
-                                params[DATA_TYPE_VALIDATE][type]
+                                val
                             );
                         }
 
                         if (!fieldValid) {
                             validate.showError(
                                 form.getErrorContainer(fieldName),
-                                validationMethod[VALIDATION_KEY_ERR].supplant({val: params[DATA_TYPE_VALIDATE][type]})
+                                validationMethod[VALIDATION_KEY_ERR].supplant({val: val})
                             );
-                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                                addClass(form.elements[fieldName], errorClass);
+                            if (form[PARAM_ELEMENTS][fieldName] && form[PARAM_ELEMENTS][fieldName].name !== undefined) {
+                                addClass(form[PARAM_ELEMENTS][fieldName], errorClass);
                             }
                             valid = !1;
-                            break;
+                            return false;
                         }
-                    }
+                    });
                 }
 
                 if (params[DATA_TYPE_WARNING]) {
@@ -1109,18 +1117,14 @@ Forms = (function() {
                             form.getWarningContainer(fieldName)
                         );
                     }
-                    if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                        removeClass(form.elements[fieldName], warningClass);
+                    if (form[PARAM_ELEMENTS][fieldName] && form[PARAM_ELEMENTS][fieldName].name !== undefined) {
+                        removeClass(form[PARAM_ELEMENTS][fieldName], warningClass);
                     }
 
-                    for (var type in params[DATA_TYPE_WARNING]) {
-                        if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(params[DATA_TYPE_WARNING], type)) {
-                            continue;
-                        }
-
+                    objEach(params[DATA_TYPE_WARNING], function(type, val) {
                         var validationMethod = validate.methods[type] || getStandartValidationMethod(type);
 
-                        if (!validationMethod) continue;
+                        if (!validationMethod) return;
 
                         if (!valid) {
                             if (form.notificationContainers[FIELD_TYPE_WARNING][fieldName]) {
@@ -1128,76 +1132,67 @@ Forms = (function() {
                                     form.getWarningContainer(fieldName)
                                 );
                             }
-                            continue;
+                            return;
                         }
                         if (type == 'required' || (value != '' && value !== null && typeof value != 'undefined')) {
                             fieldValid = validationMethod[VALIDATION_KEY_TEST](
                                 value,
-                                params[DATA_TYPE_WARNING][type]
+                                val
                             );
                         }
 
                         if (!fieldValid) {
                             validate.showError(
                                 form.getWarningContainer(fieldName),
-                                validationMethod[VALIDATION_KEY_WARN].supplant({ val: params[DATA_TYPE_WARNING][type] })
+                                validationMethod[VALIDATION_KEY_WARN].supplant({ val: val })
                             );
-                            if (form.elements[fieldName] && form.elements[fieldName].name !== undefined) {
-                                addClass(form.elements[fieldName], warningClass);
+                            if (form[PARAM_ELEMENTS][fieldName] && form[PARAM_ELEMENTS][fieldName].name !== undefined) {
+                                addClass(form[PARAM_ELEMENTS][fieldName], warningClass);
                             }
                             valid = 'warning';
-                            break;
+                            return false;
                         }
-                    }
+                    });
                 }
                 return valid;
             },
             reset: function(form) {
                 var fields = form[PARAM_CONFIG][PARAM_FIELDS];
 
-                for (var i in fields) {
-                    if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(fields, i)) {
-                        continue;
-                    }
-
-                    if (fields[i][DATA_TYPE_VALIDATE]) {
+                objEach(fields, function(i, fieldsI) {
+                    if (fieldsI[DATA_TYPE_VALIDATE]) {
                         if (form.notificationContainers[FIELD_TYPE_ERROR][i]) {
                             validate.hideError(
                                 form.getErrorContainer(i)
                             );
                         }
-                        if (form.elements[i] && form.elements[i].name !== undefined) {
-                            removeClass(form.elements[i], defaults[PARAM_ERROR_CLASS]);
+                        if (form[PARAM_ELEMENTS][i] && form[PARAM_ELEMENTS][i].name !== undefined) {
+                            removeClass(form[PARAM_ELEMENTS][i], defaults[PARAM_ERROR_CLASS]);
                         }
                     }
-                    if (fields[i][DATA_TYPE_WARNING]) {
+                    if (fieldsI[DATA_TYPE_WARNING]) {
                         if (form.notificationContainers[FIELD_TYPE_WARNING][i]) {
                             validate.hideError(
                                 form.getWarningContainer(i)
                             );
                         }
-                        if (form.elements[i] && form.elements[i].name !== undefined) {
-                            removeClass(form.elements[i], defaults[PARAM_WARNING_CLASS]);
+                        if (form[PARAM_ELEMENTS][i] && form[PARAM_ELEMENTS][i].name !== undefined) {
+                            removeClass(form[PARAM_ELEMENTS][i], defaults[PARAM_WARNING_CLASS]);
                         }
                     }
-                }
+                });
             },
             process: function (form) {
                 var valid = {};
 
                 var fields = form[PARAM_CONFIG][PARAM_FIELDS];
 
-                for (var i in fields) {
-                    if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(fields, i)) {
-                        continue;
+                objEach(fields, function(i, fieldsI) {
+                    if (!fieldsI[DATA_TYPE_VALIDATE] && !fieldsI[DATA_TYPE_WARNING]) {
+                        return;
                     }
-
-                    if (!fields[i][DATA_TYPE_VALIDATE] && !fields[i][DATA_TYPE_WARNING]) {
-                        continue;
-                    }
-
-                    valid[i] = validate.field(form, i, fields[i], fieldValue.get(i, form[PARAM_CURRENT_DATA]), defaults[PARAM_ERROR_CLASS], defaults[PARAM_WARNING_CLASS])
-                }
+                    valid[i] = validate.field(form, i, fieldsI, fieldValue.get(i, form[PARAM_CURRENT_DATA]), defaults[PARAM_ERROR_CLASS], defaults[PARAM_WARNING_CLASS])
+                });
 
                 return valid;
             }
@@ -1205,13 +1200,9 @@ Forms = (function() {
 
         /* adding custom validations for all objects of current factory */
         if (def[PARAM_VALIDATION_METHODS]) {
-            for (var method in def[PARAM_VALIDATION_METHODS]) {
-                if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(def[PARAM_VALIDATION_METHODS], method)) {
-                    continue;
-                }
-
-                validate.methods[method] = def[PARAM_VALIDATION_METHODS][method];
-            }
+            objEach(def[PARAM_VALIDATION_METHODS], function(method, val) {
+                validate.methods[method] = val;
+            });
         }
 
         function Form(conf) {
@@ -1246,6 +1237,7 @@ Forms = (function() {
             };
 
             form[PARAM_IS_CHANGED] = !1;
+            form[PARAM_DEFAULT_DATA] = {}; /* default values. after inserting fields, initializing and setting default values, before insertin "data" */
             form[PARAM_CURRENT_DATA] = {}; /* always current data from all the fields */
             form[PARAM_INITIAL_DATA] = {}; /* cloned formData after the initialization. Every save clones it again */
             form[PARAM_DIFFERS_OBJ] = {}; /* mark here fieldNames which have changed (if differs current value and saved value) */
@@ -1279,7 +1271,6 @@ Forms = (function() {
                 opt[PARAM_CONFIG][PARAM_VALIDATION_TYPE] = defaults[PARAM_VALIDATION_TYPE];
             }
 
-            /* deprecated */
             form.getFormData = function () {
                 return form[PARAM_CURRENT_DATA];
             };
@@ -1290,31 +1281,69 @@ Forms = (function() {
 
             form.action = opt[PARAM_CONTAINER].getAttribute('action');
 
+            var onFieldChange = opt[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
+
+            form.resetToDefaults = function() {
+                setFormData(form, form[PARAM_DEFAULT_DATA]);
+            };
+            form.changeField = function(name, value) {
+                var data = {};
+                fieldValue.set(name, value, data);
+                setFormData(form, data, true);
+            };
+            form.changeFormData = function(data) {
+                setFormData(form, data, true);
+            };
+            form.setField = function(name, value) {
+                setFieldValueByName(form, name, value);
+            };
+            form.setFormData = function(data) {
+                setFormData(form, data);
+            };
+            form.clearForm = function(fireCb) {
+                fireCb = fireCb || false;
+
+                objEach(form[PARAM_ELEMENTS], function(name, elem) {
+                    var value = null;
+
+                    var setResult = setFieldValue(elem, value);
+
+                    if (!setResult) {
+                        value = defaultValues[(elem.type || elem.tagName).toLowerCase()];
+                    }
+
+                    fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
+
+                    if (fireCb) {
+                        onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
+                    }
+                })
+            };
+            form.fireOnFieldChangeCallbacks = function() {
+                objEach(form[PARAM_ELEMENTS], function(name, elem) {
+                    onFieldChange(name, fieldValue.get(name, form[PARAM_CURRENT_DATA]), form)
+                });
+            };
+
+            form.resetValidation = function() {
+                validate.reset(form);
+            };
+
             /* TODO check usages */
             form.getFieldValue = function(name) {
                 return getFieldValueByName(form, name);
             };
-            var onFieldChange = opt[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
 
-            form.setField = function(name, value, fireCb) {
-                setFieldValueByName(form, name, value);
-                if (fireCb && onFieldChange) {
-                    onFieldChange(name, value)
-                }
-            };
             /* TODO fill using fieldValue */
-            form.setFields = function(arr, fireCb) {
-                for (var name in arr) {
-                    if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(arr, name)) {
-                        continue;
-                    }
-                    form.setField(name, arr[name], fireCb);
-                }
-            };
+            /*form.setFields = function(arr, fireCb) {
+                objEach(arr, function(name, arrName) {
+                    form.setField(name, arrName, fireCb);
+                });
+            };*/
 
             /* TODO check usages */
             form.getField = function (name) {
-                return form.elements[name];
+                return form[PARAM_ELEMENTS][name];
             };
 
             /* function is called before every submition or onChange */
@@ -1333,7 +1362,7 @@ Forms = (function() {
                     form[PARAM_CONFIG][PARAM_VALIDATE](form, form[PARAM_CURRENT_DATA]) :
                     validate.process(form);
             };
-            form.clear = clear.bind(form);
+            /*form.clear = clear.bind(form);*/
 
             form.notificationContainers = {};
             form.notificationContainers[FIELD_TYPE_ERROR] = {};
@@ -1342,13 +1371,9 @@ Forms = (function() {
             form.getErrorContainer = function (name) {
                 return getNotificationContainer.call(form, FIELD_TYPE_ERROR, name, defaults[PARAM_ERROR_CLASS])
             };
-
             form.getWarningContainer = function (name) {
                 return getNotificationContainer.call(form, FIELD_TYPE_WARNING, name, defaults[PARAM_WARNING_CLASS])
             };
-
-
-
             form.saveChanges = function () {
                 /* stores saved changes */
                 form[PARAM_DIFFERS_OBJ] = {};
@@ -1360,43 +1385,36 @@ Forms = (function() {
                 (opt[PARAM_CONFIG][PARAM_ON_CHANGE] || defaults[PARAM_ON_CHANGE])(!1, form);
                 form[PARAM_IS_CHANGED] = !1;
             };
-
-            form.resetToDefaults = function(fireCb) {
-                form[PARAM_CURRENT_DATA] = {};
-                setDefaultValuesToFields(form, {}, true);
-            };
-            form.resetValidation = function() {
-                validate.reset(form);
-            };
-            form.checkForm = function() {
-                var allValues = form.getAllValues();
-                alert(differs(allValues, form[PARAM_CURRENT_DATA], 1) ? 'something is wrong' : 'SUCCESSFUL');
-            };
-
             form.getAllValues = function() {
                 return formToArray(form[PARAM_CONTAINER])
             };
 
-            /* before inserting, let's read all the existing fields into form[PARAM_CURRENT_DATA]  */
+            /* pulling values for existing fields */
             form[PARAM_CURRENT_DATA] = formToArray(form[PARAM_CONTAINER]);
+            form[PARAM_DEFAULT_DATA] = cloneObject(form[PARAM_CURRENT_DATA]);
 
-            /* inserting field into wrappers */
+            /* inserting fields into wrappers */
             insertFields(
                 form,
                 opt[PARAM_CONFIG][PARAM_FIELDS],
                 !!(opt[PARAM_CONFIG][PARAM_FLAGS] & FLAG_DEBUG)
             );
 
-            elementsProcess.call(form, function (elem) {});
+            /* making a convenient elements object */
+            form[PARAM_ELEMENTS] = {};
+            for (var i = 0, elem; elem = form[PARAM_CONTAINER][i]; i++) {
+                if (form[PARAM_ELEMENTS][elem.name]) {
+                    if (isArray(form[PARAM_ELEMENTS][elem.name])) {
+                        form[PARAM_ELEMENTS][elem.name].push(elem);
+                    } else {
+                        form[PARAM_ELEMENTS][elem.name] = Array[PARAM_PROTOTYPE].concat(form[PARAM_ELEMENTS][elem.name], elem);
+                    }
+                } else {
+                    form[PARAM_ELEMENTS][elem.name] = elem;
+                }
+            }
 
-            /*
-             * setting default values
-             * setting values from data
-             * onChange callback depends on validation type
-             * tabIndexes
-             * setting attributes to the fields TODO see if I can do this during the insertion
-             * */
-            setDefaultValuesToFields(form, form[PARAM_CONFIG][PARAM_DATA]);
+            setFormData(form, form[PARAM_CONFIG][PARAM_DATA]);
 
             if (opt[PARAM_CONFIG][PARAM_ON_INIT]) {
                 opt[PARAM_CONFIG][PARAM_ON_INIT](form);
@@ -1404,7 +1422,6 @@ Forms = (function() {
 
             bindFormEvents(form);
 
-            /* stores current changes */
             form.saveChanges();
 
             if (opt[PARAM_CONFIG][PARAM_VALIDATION_TYPE] === VALIDATION_ASAP) {
