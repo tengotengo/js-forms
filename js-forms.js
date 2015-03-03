@@ -724,6 +724,9 @@ Forms = (function() {
     function isElementDisabled(elem) {
         return !!((elem.type && elem.type == 'disabled') || elem.disabled || elem.getAttribute('disabled'))
     }
+    function isElementHidden(elem) {
+        return !!((elem.type && elem.type == 'hidden'))
+    }
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
         obj.setAttribute('class', 'form_' + type + '_' + name);
@@ -1281,8 +1284,6 @@ Forms = (function() {
 
             form.action = opt[PARAM_CONTAINER].getAttribute('action');
 
-            var onFieldChange = opt[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
-
             form.resetToDefaults = function() {
                 setFormData(form, form[PARAM_DEFAULT_DATA]);
             };
@@ -1304,24 +1305,38 @@ Forms = (function() {
                 fireCb = fireCb || false;
 
                 objEach(form[PARAM_ELEMENTS], function(name, elem) {
+                    var elemSample = elem[0] ? elem[0] : elem;
+
                     var value = null;
+
+                    if (isElementDisabled(elemSample) || isElementHidden(elemSample)) {
+                        return
+                    }
 
                     var setResult = setFieldValue(elem, value);
 
                     if (!setResult) {
-                        value = defaultValues[(elem.type || elem.tagName).toLowerCase()];
+                        value = defaultValues[(elemSample.type || elemSample.tagName).toLowerCase()];
                     }
-
-                    fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
 
                     if (fireCb) {
                         onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
                     }
+
+                    fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
                 })
             };
-            form.fireOnFieldChangeCallbacks = function() {
+            form.fireOnFieldChangeCallbacks = function(name) {
+                var onFieldChange = form[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
+                if (!onFieldChange) {
+                    return;
+                }
+                if (name) {
+                    onFieldChange(name, fieldValue.get(name, form[PARAM_CURRENT_DATA]), form);
+                    return;
+                }
                 objEach(form[PARAM_ELEMENTS], function(name, elem) {
-                    onFieldChange(name, fieldValue.get(name, form[PARAM_CURRENT_DATA]), form)
+                    onFieldChange(name, fieldValue.get(name, form[PARAM_CURRENT_DATA]), form);
                 });
             };
 
@@ -1333,13 +1348,6 @@ Forms = (function() {
             form.getFieldValue = function(name) {
                 return getFieldValueByName(form, name);
             };
-
-            /* TODO fill using fieldValue */
-            /*form.setFields = function(arr, fireCb) {
-                objEach(arr, function(name, arrName) {
-                    form.setField(name, arrName, fireCb);
-                });
-            };*/
 
             /* TODO check usages */
             form.getField = function (name) {
@@ -1413,7 +1421,6 @@ Forms = (function() {
                     form[PARAM_ELEMENTS][elem.name] = elem;
                 }
             }
-
             setFormData(form, form[PARAM_CONFIG][PARAM_DATA]);
 
             if (opt[PARAM_CONFIG][PARAM_ON_INIT]) {
