@@ -234,7 +234,7 @@ Forms = (function() {
         get : function(fieldName, reference) {
             return this.getOrDel(fieldName, reference);
         },
-        setVal : function(namesArr, value, ref) {
+        setVal: function(namesArr, value, ref, hard) {
             if (!namesArr[PARAM_LENGTH]) {
                 return;
             }
@@ -256,6 +256,10 @@ Forms = (function() {
                 ref[name] = value;
                 return
             }
+            if (next == '' && hard) {
+                ref[name] = value;
+                return
+            }
             if (name == '') {
                 if (!tmpObj.push) tmpObj = [];
 
@@ -264,19 +268,21 @@ Forms = (function() {
                 );
                 name = tmpObj[PARAM_LENGTH] - 1;
             }
-            tmpObj = tmpObj[name] = (typeof tmpObj[name] == 'object' && tmpObj[name] !== null) ? tmpObj[name] : (next == '' ? [] : {});
-            fieldValue.setVal(namesArr, value, tmpObj)
+            tmpObj = tmpObj[name] =
+                (typeof tmpObj[name] == 'object' && tmpObj[name] !== null) ?
+                    tmpObj[name] : (
+                        next == '' ? [] : {}
+                    );
+            fieldValue.setVal(namesArr, value, tmpObj, hard)
         },
-        set : function(fieldName, value, reference) {
+        set : function(fieldName, value, reference, hard) {
             var arr = this.getPath(fieldName);
-
-            fieldValue.setVal(arr, value, reference);
+            fieldValue.setVal(arr, value, reference, hard);
         }
     };
     function error() {
         throw new Error(Array[PARAM_PROTOTYPE].slice.call(arguments).join(', '))
     }
-
     function objEach(o, callback) {
         for (var i in o) {
             if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(o, i)) {
@@ -287,7 +293,6 @@ Forms = (function() {
             }
         }
     }
-
     function warning() {
         console.log(Array[PARAM_PROTOTYPE].slice.call(arguments).join(', '))
     }
@@ -300,7 +305,7 @@ Forms = (function() {
         var onFieldChange = this[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
 
         if (differs(oldValue, newValue, !0)) {
-            fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA]);
+            fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA], 1);
 
             switch (type) {
                 case VALIDATION_ON_CHANGE:
@@ -851,9 +856,12 @@ Forms = (function() {
                     /* however we will set the field value if it's not default (null) */
                     return;
                 }
-                /* if input was already in the form then we have the value in PARAM_CURRENT_DATA and no need to set it */
-                if (!valueCame && fieldValue.get(name, form[PARAM_CURRENT_DATA]) !== undefined) {
-                    return;
+                /* if input was already in the form and has defaultValue then we have the value in PARAM_CURRENT_DATA and no need to set it */
+                if (!valueCame) {
+                    var existingValue = fieldValue.get(name, form[PARAM_CURRENT_DATA]);
+                    if (existingValue !== undefined && existingValue != defaultValue) {
+                        return;
+                    }
                 }
 
                 /* setting the value in the field */
@@ -1217,6 +1225,7 @@ Forms = (function() {
             opt[PARAM_CONTAINER] = null;
 
             opt[PARAM_CONFIG] = conf || null;
+            opt[PARAM_CONFIG][PARAM_FIELDS] = opt[PARAM_CONFIG][PARAM_FIELDS] || {};
 
             function processConfig(c) {
                 /* TODO check if incoming object is valid */
@@ -1326,6 +1335,9 @@ Forms = (function() {
                     fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
                 })
             };
+            form.fireFormChangeCallback = function(name) {
+                onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
+            };
             form.fireOnFieldChangeCallbacks = function(name) {
                 var onFieldChange = form[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
                 if (!onFieldChange) {
@@ -1421,6 +1433,7 @@ Forms = (function() {
                     form[PARAM_ELEMENTS][elem.name] = elem;
                 }
             }
+
             setFormData(form, form[PARAM_CONFIG][PARAM_DATA]);
 
             if (opt[PARAM_CONFIG][PARAM_ON_INIT]) {
@@ -1455,6 +1468,7 @@ Forms = (function() {
         getList: function () {
             return formsList
         },
+        fv: fieldValue,
         VALIDATION_ON_SUBMIT: VALIDATION_ON_SUBMIT,
         VALIDATION_ON_CHANGE: VALIDATION_ON_CHANGE,
         VALIDATION_ASAP: VALIDATION_ASAP,
