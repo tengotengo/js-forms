@@ -102,6 +102,7 @@ Forms = (function() {
     var defaultValues = {
         select: null,
         'select-one': null,
+        hidden: '',
         text: '',
         textarea: '',
         radio: null,
@@ -233,6 +234,24 @@ Forms = (function() {
         },
         get : function(fieldName, reference) {
             return this.getOrDel(fieldName, reference);
+        },
+        getValueRecoursively: function(obj) {
+            if (isArray(obj)) {
+                if (!obj.length) {
+                    return null;
+                }
+                return this.getValueRecoursively(obj[0])
+            } else if (isObject(obj)) {
+                for (var i in obj) {
+                    if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(obj, i)) {
+                        continue;
+                    }
+                    return this.getValueRecoursively(obj[i])
+                }
+                return null;
+            }
+
+            return obj;
         },
         setVal: function(namesArr, value, ref, hard) {
             if (!namesArr[PARAM_LENGTH]) {
@@ -566,6 +585,30 @@ Forms = (function() {
                 return null
         }
     }
+    String.prototype.supplant = function (a, b) {
+        return this.replace(/{([^{}]*)}/g, function (c, d) {
+            return void 0!=a[d]?a[d]:b?'':c
+        })
+    };
+    function cloneObject(obj) {
+        var clone = {};
+        for(var i in obj) {
+            if(typeof(obj[i])=="object" && obj[i] != null)
+                clone[i] = cloneObject(obj[i]);
+            else
+                clone[i] = obj[i];
+        }
+        return clone;
+    }
+    function differs(a, b, notStrict) {
+        if (("string" == typeof b || "number" == typeof b) && ("string" == typeof a || "number" == typeof a)) return notStrict ? a != b : a !== b;
+        if ("object" == typeof a && "object" == typeof b && a !== null && b !== null) {
+            var c;
+            for (c in a)if (differs(a[c], b[c], notStrict))return!0;
+            for (c in b)if (differs(a[c], b[c], notStrict))return!0
+        } else if (typeof a != typeof b)return!0;
+        return!1
+    }
     /* works */
     function formToArray(formContainer) {
         var result = {};
@@ -663,10 +706,9 @@ Forms = (function() {
         };
         var result = !1;
 
-        /* TODO test more. In case if field name is xxx[] array */
         if (typeof value == 'object' && elem[PARAM_LENGTH] && value !== null) {
             for (var i = 0, el; el = elem[i]; i++) {
-                if (setValue(el, value)) {
+                if (setValue(el, fieldValue.getValueRecoursively(value[i]))) {
                     result = !0;
                 }
             }
@@ -687,6 +729,9 @@ Forms = (function() {
     }
     function isArray(a) {
         return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Array]'
+    }
+    function isObject(a) {
+        return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Object]'
     }
     function setFieldValueByName(form, name, value) {
         if (!form[PARAM_ELEMENTS][name]) return;
@@ -732,6 +777,11 @@ Forms = (function() {
     function isElementHidden(elem) {
         return !!((elem.type && elem.type == 'hidden'))
     }
+    /*function clear() {
+        elementsProcess.call(this, function (el) {
+            this.setField(el.name, null)
+        }.bind(this))
+    }*/
     function createMsgContainer(name, type, tagName) {
         var obj = document.createElement(tagName.toUpperCase());
         obj.setAttribute('class', 'form_' + type + '_' + name);
@@ -755,6 +805,11 @@ Forms = (function() {
                 if (!this[PARAM_FIELD_CONTAINER][name]) return;
 
                 errorContainer = createMsgContainer(name, type, this[PARAM_FIELD_CONTAINER][name].tagName);
+                if (!this[PARAM_FIELD_CONTAINER][name].parentNode) {
+                    onerror('!this[PARAM_FIELD_CONTAINER][name].parentNode', 'forms.js', 744, 1, name);
+                    return;
+                }
+
                 this[PARAM_FIELD_CONTAINER][name].parentNode.insertBefore(errorContainer, this[PARAM_FIELD_CONTAINER][name].nextSibling);
             }
             if (!errorContainer.children[PARAM_LENGTH]) {
@@ -813,11 +868,13 @@ Forms = (function() {
 
         return result[0] ? result : null;
     }
-    function setFormData(form, initialData, fireFieldChangeCallback) {
+    function setFormData(form, initialData, fireFieldChangeCallback, setHard) {
         fireFieldChangeCallback = fireFieldChangeCallback || false;
+        setHard = setHard || false;
 
         objEach(form[PARAM_ELEMENTS], function(name, elem) {
             /* elem here can be an array of elements */
+            if (name == '') return;
 
             var setData = function(elem, elemSample) {
                 var fieldsArr = form[PARAM_CONFIG][PARAM_FIELDS];
@@ -868,7 +925,6 @@ Forms = (function() {
                 var setResult = setFieldValue(elem, inputValue);
 
                 if (!setResult) {
-                    /* если не удалось установить такое значение, значит опять по-умолчанию */
                     inputValue = defaultValue;
                 }
 
@@ -880,7 +936,7 @@ Forms = (function() {
                     if (!valueCame || inputValue === defaultValue) {
                         fieldValue.set(name, inputValue, form[PARAM_DEFAULT_DATA]);
                     }
-                    fieldValue.set(name, inputValue, form[PARAM_CURRENT_DATA]);
+                    fieldValue.set(name, inputValue, form[PARAM_CURRENT_DATA], setHard);
                 }
             };
 
@@ -1434,7 +1490,7 @@ Forms = (function() {
                 }
             }
 
-            setFormData(form, form[PARAM_CONFIG][PARAM_DATA]);
+            setFormData(form, form[PARAM_CONFIG][PARAM_DATA], !1, 1);
 
             if (opt[PARAM_CONFIG][PARAM_ON_INIT]) {
                 opt[PARAM_CONFIG][PARAM_ON_INIT](form);

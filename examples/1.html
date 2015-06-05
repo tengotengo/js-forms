@@ -6,119 +6,365 @@
     <link rel="stylesheet" href="forms.css" />
 </head>
 <body>
-    <form id="test-form" action="/">
-        <div class="form_field_a0"></div>
-        <div class="form_field_a1"></div>
-        <div class="form_field_a2"></div>
-        <div class="form_field_a3"></div>
-        <div class="form_field_a4"></div>
-        <div class="form_field_a5"></div>
+<div class="padding-10-15">
 
-        <input type="text" name="q[asd]"/>
-        <input type="text" name="q[zxc]"/>
-        <input type="text" name="q[fg]"/>
+    <div id="document-preview"></div>
+    <form id="test-form" action="" method="POST">
+        <div class="form_field_p_id"></div>
 
-        <input type="text" name="a[]"/>
-        <input type="text" name="a[]"/>
-        <input type="text" name="a[]"/>
+        <h6 class="h-separator">
+            Fields with default values
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_label_a0"></div>
+                <div class="form_field_a0"></div>
+            </div>
 
-        <div id="form-save-btn" class="btn">SAVE</div>
+            <div class="padding-10-15">
+                <div class="form_label_a1"></div>
+                <div class="form_field_a1"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div>
+                    <label for="sometestid">Existing text field with default value</label>
+                </div>
+                <input type="text" id="sometestid" name="elem" />
+            </div>
+
+            <div class="padding-10-15">
+                <div>
+                    <label for="sometestid2">Existing text field with preset value</label>
+                </div>
+                <input type="text" id="sometestid2" name="elem2" value="zzzzzzz" />
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Warnings and errors
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_warning_a0"></div>
+                <div class="form_error_a0"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_warning_a1"></div>
+                <div class="form_error_a1"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_warning_elem"></div>
+                <div class="form_error_elem"></div>
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Radios and Checkboxes
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_field_a2"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_field_a3"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_field_a4"></div>
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Existing bitmask checkboxes
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <input type="checkbox" value="1" name="z" bitmask="1" />
+                <input type="checkbox" value="2" name="z" bitmask="1" />
+                <input type="checkbox" value="4" name="z" bitmask="1" />
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Field named "elements"
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_label_elements"></div>
+                <div class="form_field_elements"></div>
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Multi-dimensional objects
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_label_emp[name]"></div>
+                <div class="form_field_emp[name]"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <input type="text" name="arr[item][]" />
+                <input type="text" name="arr[item][]" />
+            </div>
+
+            <div class="padding-10-15">
+                <input type="text" name="bb[][qq]" />
+                <input type="text" name="bb[][qq]" />
+            </div>
+
+            <div class="padding-10-15">
+                <input type="text" name="cc[][][qwe][][b]" />
+                <input type="text" name="cc[][][qwe][][b]" />
+                <input type="text" name="cc[][][qwe][][b]" />
+            </div>
+
+            <div class="padding-10-15">
+                <input type="text" name="yollo[][qq][]" />
+                <input type="text" name="yollo[][qq][]" />
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Dropdown selects
+        </h6>
+        <div class="h6-wrapper">
+            <div class="padding-10-15">
+                <div class="form_label_a5"></div>
+                <div class="form_field_a5"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_label_a6"></div>
+                <div class="form_field_a6"></div>
+            </div>
+
+            <div class="padding-10-15">
+                <div class="form_label_a7"></div>
+                <div class="form_field_a7"></div>
+            </div>
+        </div>
+
+        <h6 class="h-separator">
+            Form Data (JSON):
+        </h6>
+        <div class="h6-wrapper" id="json-data" style="word-break: break-all;"></div>
+
+        <div>
+            <div class="btn" id="submit-btn">Save button</div>
+        </div>
+
+        <input type="submit" value="Submit button (when exists, submits by Enter)"/>
     </form>
-
-    <div>JSON:</div>
-    <div id="json-form"></div>
+</div>
 
     <script type="text/javascript">
         (function (w, d) {
             try {
-                var data = {"a0":"1","a1":"axvxcv","a2":"1","a3":4,"a4":null,"a5":"","q":{"asd":"sdfg","zxc":"bnm","fg":"eee"},"a":["rrr","tttt","yyy"]};
+//                var data = {};
+                var data = {"elem":"123","elem2":"qweqwe","z":7,"arr":{"item":["22222222222","3333333333"]},"bb":[{"qq":"44444444444"},{"qq":"5555555555"}],"cc":[[{"qwe":[{"b":"6666666666666"}]}],[{"qwe":[{"b":"7777777777"}]}],[{"qwe":[{"b":"888888888888"}]}]],"yollo":[{"qq":["9999999999"]},{"qq":["zzzzzzzzzzzz"]}],"p_id":"9999","a0":"12312","a1":"2321","a2":"1","a3":21,"a4":"3","elements":"1231231","emp":{"name":"11111111"},"a5":"3","a6":"3","a7":"3"};
+
                 var dataSample = {
-                    a0: {
-                        validate: {
-                            min: 0,
-                            int: 1
-                        },
-                        warning: {
-                            max: 100
-                        },
-                        type: 'textarea',
-                        defaultVal: 'xvxcvxcvb',
-                        label: 'Sample field textarea'
-                    },
-                    a1: {
-                        validate: {
-                            test: 1
-                        },
-                        warning: {
-                            max: 100
-                        },
-                        type: 'text',
-                        'class': ['awesome'],
-                        defaultVal: 'axvxcv',
-                        label: 'Sample field text'
-                    },
-                    a2: {
-                        validate: {
-                            required: 1
-                        },
-                        type: 'checkbox',
-                        defaultVal: true,
-                        data: {
-                            'Single checkbox': 1
+                    p_id : {
+                        type : 'hidden',
+                        validate : {
+                            required : 1,
+                            int : 1
                         }
                     },
-                    a3: {
-                        validate: {
-                            required: 1
+                    /*id : {
+                     type : 'hidden',
+                     validate : {
+                     required : 1,
+                     int : 1
+                     }
+                     },*/
+                    elements : {
+                        validate : {
+                            min : 0,
+                            int : 1
                         },
-                        type: 'checkbox',
-                        bitmask: true,
-                        data: {
-                            'Label 1': 1,
-                            'Label 2': 2,
-                            'Label 3': 4
+                        warning : {
+                            max : 100
+                        },
+                        type : 'textarea',
+                        defaultVal : 'xvxcvxcvb',
+                        label : 'Sample field textarea'
+                    },
+                    a0 : {
+                        validate : {
+                            min : 0,
+                            int : 1
+                        },
+                        warning : {
+                            max : 100
+                        },
+                        type : 'textarea',
+                        defaultVal : '23',
+                        label : 'Field Label'
+                    },
+                    elem2 : {
+                        type : 'text',
+                        defaultVal : 'bbbbbb',
+                        label : 'Field Label'
+                    },
+                    elem : {
+                        validate : {
+                            min : 0,
+                            int : 1
+                        },
+                        warning : {
+                            max : 100
+                        },
+                        type : 'text',
+                        'class' : ['awesome'],
+                        defaultVal : '54',
+                        label : 'Field Label'
+                    },
+                    a1 : {
+                        validate : {
+                            min : 0,
+                            int : 1
+                        },
+                        warning : {
+                            max : 100
+                        },
+                        type : 'text',
+                        'class' : ['awesome'],
+                        defaultVal : 'axvxcv',
+                        label : 'Field Label'
+                    },
+                    a2 : {
+                        validate : {
+                            required : 1
+                        },
+                        type : 'checkbox',
+                        defaultVal : 1,
+                        data : {
+                            'Single checkbox' : 1
                         }
                     },
-                    a4: {
-                        type: 'radio',
-                        data: {
-                            'Label 1': 1,
-                            'Label 2': 2,
-                            'Label 3': 3
+                    a3 : {
+                        type : 'checkbox',
+                        bitmask : true,
+                        data : {
+                            'bitmask 1' : 1,
+                            'bitmask 2' : 2,
+                            'bitmask 4' : 4,
+                            'bitmask 8' : 8,
+                            'bitmask 16' : 16
                         }
                     },
-                    a5: {
-                        label: 'Select Label',
-                        type: 'select',
-                        data: {
-                            'item1': 1,
-                            'item2': 2,
-                            'item3': 3
+                    a4 : {
+                        type : 'radio',
+                        data : {
+                            'Radio 1' : 1,
+                            'Radio 2' : 2,
+                            'Radio 3' : 3
                         }
-                    }
+                    },
+                    a5 : {
+                        label : 'Select with empty item selected by default',
+                        type : 'select',
+                        data : {
+                            'item1' : 1,
+                            'item2' : 2,
+                            'item3' : 3
+                        }
+                    },
+                    a6 : {
+                        label : 'Select with defaultValue',
+                        type : 'select',
+                        defaultVal: 2,
+                        data : {
+                            'item1' : 1,
+                            'item2' : 2,
+                            'item3' : 3
+                        }
+                    },
+                    a7 : {
+                        label : 'Select without a defaultValue',
+                        type : 'select',
+                        notEmpty: true,
+                        data : {
+                            'item1' : 1,
+                            'item2' : 2,
+                            'item3' : 3
+                        }
+                    },
+                    "emp[name]" : {
+                        label : 'key-value',
+                        type : 'text'
+                    }/*,
+                     "arr[item][]" : {
+                     label : 'array-value',
+                     type : 'text'
+                     }*/
                 };
 
-                var form = new Forms.Form({
-                    id : 'test-form',
-                    flags : Forms.FLAG_DEBUG | Forms.FLAG_SUBMIT_EMPTY | Forms.FLAG_UNIQUE_LABELS | Forms.FLAG_ASYNC,
-                    validationType : Forms.VALIDATION_ON_SUBMIT,
-                    params : {
-                        additionalParam : 123
+                w.TestForm1 = new Forms.Form({
+                    flags: Forms.FLAG_DEBUG | Forms.FLAG_ASYNC,
+                    validationType: Forms.VALIDATION_ASAP,
+                    submitCallback: function(status, result, callback) {
+                        console.log('______CAFE SUBMIT CALLBACK', arguments);
                     },
-                    onChange : function(isDifferent, form) {
-                        console.log(isDifferent);
+                    fieldContext: function(e, elem, form) {
+                        console.log('showing element context menu');
                     },
-                    onFieldChange : function(fieldName, value) {
-                        d.getElementById('json-form').innerHTML = JSON.stringify(form.getFormData())
+                    formContext: function(e, form) {
+                        console.log('showing context menu');
+                    },
+                    onValidate: function(validationResult, callback) {
+                        console.log('validationResult', validationResult);
+
+                        var isValid = !0;
+
+                        for (var i in validationResult) {
+                            if (validationResult[i] === false) {
+                                isValid = !1
+                            }
+                        }
+
+                        if (!isValid) {
+                            console.log('validation callback');
+                            return;
+                        }
+
+                        callback();
+                    },
+                    ajax: function(url, method, data, successCallback, errorCallback) {
+                        console.log('sending ajax request', url);
+                        successCallback(true, {});
+
+                        /*_ajax.get(url, data, successCallback, method);*/
+                    },
+                    onChange: function(isChanged, form) {
+                        console.log('form changed', isChanged);
+                        form.container.parentNode.style.backgroundColor =  isChanged ? 'rgb(255, 253, 227)' : 'rgb(255, 255, 255)';
+                        d.getElementById('json-data').innerHTML = JSON.stringify(form.getFormData());
+                    }
+                });
+
+                var form = new TestForm1.create({
+                    obj : document.getElementById('test-form'),
+                    onFieldChange : function(name, value) {
+                        console.log('onFieldChange', name, value);
+                        d.getElementById('json-data').innerHTML = JSON.stringify(form.getFormData());
+                    },
+                    onInit: function() {
+                        console.log('Form is initialized')
                     },
                     fields : dataSample,
                     data : data
                 });
-
-                d.getElementById('form-save-btn').addEventListener('click', function() {
-                    form.submit()
-                });
-
+                d.getElementById('submit-btn').addEventListener('click', function() {
+                    form.submit();
+                })
             } catch (e) {
                 console.log(e);
             }

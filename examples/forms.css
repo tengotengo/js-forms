@@ -24,3 +24,40 @@ input[type="text"].error, input[type="password"].error, select.error, textarea.e
 input[type="text"].warning, input[type="password"].warning, select.warning, textarea.warning {
     background-color: #D0F0F3;
 }
+input[type="submit"], button, .btn {
+    display: inline-block;
+    *display: inline;
+    zoom: 1;
+    text-align: center;
+    background-color: #dde7eb;
+    color: #5c6164;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    margin: 0;
+    /*min-width: 40px;*/
+}
+.btn.active, button.active {
+    background-color: #9fc1c8;
+    color: #5c6164;
+}
+input[type="submit"]:hover, button:hover, .btn:hover {
+    background-color: #B0D3DA;
+    color: #5c6164;
+}
+.btn.active:hover {
+    cursor: default;
+    background-color: #9fc1c8;
+    color: #5c6164;
+}
+.btn.disabled:hover, button.disabled:hover, input[type="submit"].disabled:hover {
+    background-color: #ECECEC;
+    color: #CECECE;
+}
+.btn.disabled, button.disabled, input[type="submit"].disabled {
+    cursor: default;
+    background-color: #ECECEC;
+    color: #CECECE;
+    outline: 1px dashed rgb(247, 247, 247);
+    outline-offset: -1px;
+}
