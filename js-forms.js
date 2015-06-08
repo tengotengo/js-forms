@@ -236,12 +236,16 @@ Forms = (function() {
             return this.getOrDel(fieldName, reference);
         },
         getValueRecoursively: function(obj) {
+            if (obj === void 0) {
+                return null
+            }
             if (isArray(obj)) {
                 if (!obj.length) {
                     return null;
                 }
                 return this.getValueRecoursively(obj[0])
-            } else if (isObject(obj)) {
+            }
+            if (isObject(obj)) {
                 for (var i in obj) {
                     if (!Object[PARAM_PROTOTYPE][PARAM_HAS_OWN_PROPERTY].call(obj, i)) {
                         continue;
@@ -585,7 +589,7 @@ Forms = (function() {
                 return null
         }
     }
-    String.prototype.supplant = function (a, b) {
+    String.prototype.supplant = String.prototype.supplant || function (a, b) {
         return this.replace(/{([^{}]*)}/g, function (c, d) {
             return void 0!=a[d]?a[d]:b?'':c
         })
