@@ -164,21 +164,21 @@ Forms = (function() {
             'Must be {val} characters long',
             'Should be {val} characters long',
             function (val, rule) {
-                return val[PARAM_LENGTH] == rule
+                return (''+val)[PARAM_LENGTH] == rule
             }
         ],
         'maxLength': [
-            'Must be <= {val} characters long',
+            'Must not be more than {val} characters long',
             'Should be less than {val} characters long',
             function (val, rule) {
-                return val[PARAM_LENGTH] <= rule
+                return (''+val)[PARAM_LENGTH] <= rule
             }
         ],
         'minLength': [
-            'Must be >= {val} characters long',
+            'Must be at least {val} characters long',
             'Should be more than {val} characters long',
             function (val, rule) {
-                return val[PARAM_LENGTH] <= rule
+                return (''+val)[PARAM_LENGTH] >= rule
             }
         ],
         'required': [
@@ -189,8 +189,30 @@ Forms = (function() {
             }
         ]
     };
+    var hasOwnProperty = Object.prototype.hasOwnProperty;
+    function isArray(a) {
+        return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Array]'
+    }
+    function isObject(a) {
+        return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Object]'
+    }
+    function isEmpty(a) {
+        if (null == a || "" == a)return!0;
+        if ("number" == typeof a || "string" == typeof a)return!1;
+        var b = !0;
+        if (isArray(a)) {
+            if (!a.length)return!0;
+            for (var c = 0; c < a.length; c++)isEmpty(a[c]) || (b = !1);
+            return b
+        }
+        if (isObject(a)) {
+            for (var d in a)hasOwnProperty.call(a, d) && (isEmpty(a[d]) || (b = !1));
+            return b
+        }
+        return!0
+    }
     var fieldValue = {
-        allReg : /\[([a-zA-Z0-9-]*)\]/g,
+        allReg : /\[([a-zA-Z0-9-_]*)\]/g,
         isObjReg : /\[(.*)\]/g,
         getPath: function(fieldName) {
             var freeVar = fieldName.replace(fieldValue.isObjReg, '');
@@ -214,21 +236,82 @@ Forms = (function() {
         getOrDel: function(fieldName, reference, del) {
             var arr = this.getPath(fieldName);
 
-            if (reference === undefined || reference[arr[0]] === undefined) return undefined;
+            if (reference === undefined ||
+                reference === null) return null;
 
-            var tmpObj = reference, lastTmpObj, lastInd;
+            var firstObj,
+                firstInd,
+                secondObj,
+                secondInd,
+                thirdObj,
+                thirdInd;
 
             for (var i = 0; i < arr[PARAM_LENGTH]; i++) {
-                if (tmpObj[arr[i]] !== undefined) {
-                    if (tmpObj[arr[i]] == '') {
-                        return del ? delete tmpObj[arr[i]] : tmpObj[arr[i]];
-                    }
-                    lastTmpObj = tmpObj;
-                    lastInd = arr[i];
-                    tmpObj = tmpObj[arr[i]]
+                firstInd = arr[i]; // 'rooms'
+                secondInd = arr[i + 1]; // 'r4'
+                thirdInd = arr[i + 2]; // ''
+                secondObj = void 0;
+                thirdObj = void 0;
+
+                firstObj = reference[firstInd]; // always there
+
+                if (isEmpty(firstObj)) {
+                    delete reference[firstInd];
+                    return null;
                 }
+
+                // checking secondInd
+                if (secondInd === void 0 || secondInd == '') {
+                    if (del) {
+                        delete reference[firstInd];
+                        return null;
+                    }
+                    return firstObj;
+                }
+
+                secondObj = firstObj[secondInd];
+
+                if (secondObj === void 0) {
+                    delete firstObj[secondInd];
+                    if (isEmpty(firstObj)) {
+                        delete reference[firstInd];
+                        return null;
+                    }
+                    return null;
+                }
+
+                // checking thirdInd
+                if (thirdInd === void 0 || thirdInd == '') {
+                    if (del) {
+                        delete firstObj[secondInd];
+                        if (isEmpty(firstObj)) {
+                            delete reference[firstInd];
+                            return null;
+                        }
+                        return null;
+                    }
+                    return secondObj;
+                }
+
+                thirdObj = secondObj[thirdInd];
+
+                if (thirdObj === void 0) {
+                    delete secondObj[thirdInd];
+                    if (isEmpty(secondObj)) {
+                        delete firstObj[secondInd];
+                        if (isEmpty(firstObj)) {
+                            delete reference[firstInd];
+                            return null;
+                        }
+                        return null;
+                    }
+                    return null;
+                }
+
+                reference = firstObj;
             }
-            return del ? delete lastTmpObj[lastInd] : tmpObj;
+
+            return null;
         },
         del: function(fieldName, reference) {
             return this.getOrDel(fieldName, reference, !0);
@@ -338,7 +421,11 @@ Forms = (function() {
         var onFieldChange = this[PARAM_CONFIG][PARAM_ON_FIELD_CHANGE] || false;
 
         if (differs(oldValue, newValue, !0)) {
-            fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA], 1);
+            if (isEmpty(newValue)) {
+                fieldValue.del(fieldName, this[PARAM_CURRENT_DATA]);
+            } else {
+                fieldValue.set(fieldName, newValue, this[PARAM_CURRENT_DATA], 1);
+            }
 
             switch (type) {
                 case VALIDATION_ON_CHANGE:
@@ -473,7 +560,7 @@ Forms = (function() {
                         });
                     }
 
-                    form[PARAM_DEFAULTS][PARAM_AJAX_FUNCTION](form.action, "POST", form[PARAM_CURRENT_DATA], (function (cb) {
+                    form[PARAM_DEFAULTS][PARAM_AJAX_FUNCTION](form[PARAM_ACTION], "POST", form[PARAM_CURRENT_DATA], (function (cb) {
                         return function (status, data) {
                             if (status) {
                                 form.saveChanges();
@@ -496,7 +583,8 @@ Forms = (function() {
         if (form[PARAM_CONFIG][PARAM_FLAGS] & FLAG_NO_SUBMIT) {
             /* if submit is prevented */
             submit = function(){
-                console.log('submit is prevented', form[PARAM_CONFIG][PARAM_FLAGS]);
+                var onSubmit = form[PARAM_CONFIG][PARAM_ON_SUBMIT] || function(){};
+                onSubmit();
             };
         }
 
@@ -617,11 +705,17 @@ Forms = (function() {
     }
     function differs(a, b, notStrict) {
         if (("string" == typeof b || "number" == typeof b) && ("string" == typeof a || "number" == typeof a)) return notStrict ? a != b : a !== b;
-        if ("object" == typeof a && "object" == typeof b && a !== null && b !== null) {
-            var c;
-            for (c in a)if (differs(a[c], b[c], notStrict))return!0;
-            for (c in b)if (differs(a[c], b[c], notStrict))return!0
-        } else if (typeof a != typeof b)return!0;
+        if ("object" == typeof a && "object" == typeof b) {
+            if (a !== null && b !== null) {
+                var c;
+                for (c in a)if (differs(a[c], b[c], notStrict))return!0;
+                for (c in b)if (differs(a[c], b[c], notStrict))return!0
+            } else if (a === null && b === null) {
+                return !1
+            } else {
+                return !0
+            }
+        } else if (typeof a != typeof b) return!0;
         return!1
     }
     /* works */
@@ -640,20 +734,15 @@ Forms = (function() {
             }
 
             var value = getElementValue(element);
-            var existing = fieldValue.get(name, result);
 
-            /* если значение еще не существует, и значение элемента null */
-            if (existing === undefined && value === null) {
-                fieldValue.set(name, null, result);
-            }
+            if (value === null || value === '') continue;
+
+            var existing = fieldValue.get(name, result);
 
             if (element.hasAttribute(DATA_TYPE_BITMASK)) {
                 value = parseInt(value, 10) || 0;
                 value |= parseInt(existing, 10) || 0;
             }
-
-            /* TODO including empty values? */
-            if (value === null) continue;
 
             fieldValue.set(name, value, result);
         }
@@ -704,7 +793,7 @@ Forms = (function() {
                             return !0;
                         case 'checkbox':
                             var isBitmask = el.hasAttribute(DATA_TYPE_BITMASK);
-                            if ((isBitmask && !!(el.value & val)) || (!!val && val !== '0' && val !== '!1' && !isBitmask)) {
+                            if ((isBitmask && !!(el.value & val)) || (!!val && val !== '0' && !isBitmask)) {
                                 el.setAttribute('checked', 'true');
                                 el.checked = !0;
                             } else {
@@ -724,8 +813,16 @@ Forms = (function() {
 
         if (typeof value == 'object' && elem[PARAM_LENGTH] && value !== null) {
             for (var i = 0, el; el = elem[i]; i++) {
-                if (setValue(el, fieldValue.getValueRecoursively(value[i]))) {
-                    result = !0;
+                if (el.type == 'checkbox' && isArray(value)) {
+                    _eachArr.call(value, function(key, val) {
+                        if (el.value == val && setValue(el, val)) {
+                            result = !0;
+                        }
+                    })
+                } else {
+                    if (setValue(el, fieldValue.getValueRecoursively(value[i]))) {
+                        result = !0;
+                    }
                 }
             }
             return result;
@@ -743,12 +840,7 @@ Forms = (function() {
 
         return setValue(elem, value);
     }
-    function isArray(a) {
-        return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Array]'
-    }
-    function isObject(a) {
-        return Object[PARAM_PROTOTYPE].toString.call(a) === '[object Object]'
-    }
+
     function setFieldValueByName(form, name, value, setFormData) {
         setFormData = setFormData || false;
 
@@ -877,7 +969,7 @@ Forms = (function() {
 
         if (!result) return null;
         if (result && result[PARAM_LENGTH] === void 0) return result;
-        if (result[PARAM_LENGTH] == 1) return result[0];
+        if (result[PARAM_LENGTH]) return result[0];
 
         return result[0] ? result : null;
     }
@@ -891,30 +983,30 @@ Forms = (function() {
 
             var setData = function(elem, elemSample) {
                 var fieldsArr = form[PARAM_CONFIG][PARAM_FIELDS];
-                var inputValue = fieldValue.get(name, initialData);
+                var valueFromData = fieldValue.get(name, initialData);
                 var notEmpty = fieldsArr[name] ? !!fieldsArr[name][DATA_TYPE_NOT_EMPTY] : false;
                 var defaultValue = defaultValues[(elemSample.type || elemSample.tagName).toLowerCase()];
                 var isDefaultFieldVal = false;
-                var valueCame = inputValue !== undefined;
+                var valueCame = valueFromData !== null;
 
-                if (inputValue === undefined) {
+                if (valueFromData === null) {
                     /* if initialData didn't come, значит одно из двух: */
                     isDefaultFieldVal = true;
                     /* иначе остается значение по-умолчанию */
-                    inputValue = defaultValue;
+                    valueFromData = defaultValue;
 
                     if (fieldsArr[name]) {
                         /* если есть в конфиге */
 
                         if (fieldsArr[name][DATA_TYPE_DEFAULT_VAL] !== undefined) {
                             /* если есть значение по-умолчанию */
-                            inputValue = fieldsArr[name][DATA_TYPE_DEFAULT_VAL];
+                            valueFromData = fieldsArr[name][DATA_TYPE_DEFAULT_VAL];
                             isDefaultFieldVal = false;
                         } else if (fieldsArr[name][DATA_TYPE_DATA] && notEmpty) {
                             /* если есть data и значение не должно быть пустым */
 
                             objEach(fieldsArr[name][DATA_TYPE_DATA], function(i, val) {
-                                inputValue = val;
+                                valueFromData = val;
                                 isDefaultFieldVal = false;
                                 return false
                             });
@@ -930,16 +1022,17 @@ Forms = (function() {
                 /* if input was already in the form and has defaultValue then we have the value in PARAM_CURRENT_DATA and no need to set it */
                 if (!valueCame) {
                     var existingValue = fieldValue.get(name, form[PARAM_CURRENT_DATA]);
-                    if (existingValue !== undefined && existingValue != (fieldsArr[name][DATA_TYPE_BITMASK] ? 0 : defaultValue)) {
+                    if (existingValue !== null && existingValue != ((fieldsArr[name] && fieldsArr[name][DATA_TYPE_BITMASK]) ? 0 : defaultValue)) {
                         return;
                     }
                 }
 
                 /* setting the value in the field */
-                var setResult = setFieldValue(elem, inputValue);
+                var setResult = setFieldValue(elem, valueFromData);
 
                 if (!setResult) {
-                    inputValue = defaultValue;
+                    /* если не удалось установить такое значение, значит опять по-умолчанию */
+                    valueFromData = defaultValue;
                 }
 
                 if (!isElementDisabled(elemSample)) {
@@ -947,10 +1040,12 @@ Forms = (function() {
                         onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
                     }
 
-                    if (!valueCame || inputValue === defaultValue) {
-                        fieldValue.set(name, inputValue, form[PARAM_DEFAULT_DATA]);
+                    if (valueFromData !== null) {
+                        if (!valueCame || valueFromData === defaultValue) {
+                            fieldValue.set(name, valueFromData, form[PARAM_DEFAULT_DATA]);
+                        }
+                        fieldValue.set(name, valueFromData, form[PARAM_CURRENT_DATA], setHard);
                     }
-                    fieldValue.set(name, inputValue, form[PARAM_CURRENT_DATA], setHard);
                 }
             };
 
@@ -994,7 +1089,7 @@ Forms = (function() {
             form[PARAM_FIELD_CONTAINER][fieldName][PARAM_INNER_HTML] = '';
 
             /* field unique id */
-            fieldId = fieldName + '-' + (fieldUniqueCounter++);
+            var fieldId = fieldName.replace(/[\[|\]]/gm, '_') + '-' + (fieldUniqueCounter++);
 
             /* inserting a label for a single field */
             var labelContainer = findElementByNameAndType(container, fieldName, FIELD_TYPE_LABEL);
@@ -1016,7 +1111,6 @@ Forms = (function() {
                 }
             }
 
-            var fieldId;
 
             /* TODO не вылядит хорошо, переписать */
             var dataArr = {};
@@ -1352,6 +1446,7 @@ Forms = (function() {
                 return;
             }
 
+            /* adding flags to default */
             opt[PARAM_CONFIG][PARAM_FLAGS] = opt[PARAM_CONFIG][PARAM_FLAGS] ? (opt[PARAM_CONFIG][PARAM_FLAGS] | defaults[PARAM_FLAGS]) : defaults[PARAM_FLAGS];
 
             if (!opt[PARAM_CONFIG][PARAM_VALIDATION_TYPE]) {
@@ -1366,7 +1461,7 @@ Forms = (function() {
                 opt[PARAM_CONTAINER].setAttribute(PARAM_ACTION, opt[PARAM_CONFIG][PARAM_ACTION])
             }
 
-            form.action = opt[PARAM_CONTAINER].getAttribute('action');
+            form[PARAM_ACTION] = opt[PARAM_CONTAINER].getAttribute(PARAM_ACTION);
 
             form.resetToDefaults = function() {
                 setFormData(form, form[PARAM_DEFAULT_DATA]);
@@ -1383,7 +1478,8 @@ Forms = (function() {
                 setFieldValueByName(form, name, value, 1);
             };
             form.setFormData = function(data) {
-                setFormData(form, data);
+                form[PARAM_CURRENT_DATA] = {};
+                setFormData(form, data, 0, 1);
             };
             form.clearForm = function(fireCb) {
                 fireCb = fireCb || false;
@@ -1399,15 +1495,12 @@ Forms = (function() {
 
                     var setResult = setFieldValue(elem, value);
 
-                    if (!setResult) {
-                        value = defaultValues[(elemSample.type || elemSample.tagName).toLowerCase()];
-                    }
-
                     if (fireCb) {
                         onChange.call(form, null, name, form[PARAM_CONFIG][PARAM_VALIDATION_TYPE]);
                     }
-
-                    fieldValue.set(name, value, form[PARAM_CURRENT_DATA]);
+                    if (setResult) {
+                        fieldValue.del(name, form[PARAM_CURRENT_DATA]);
+                    }
                 })
             };
             form.fireFormChangeCallback = function(name) {
@@ -1439,6 +1532,51 @@ Forms = (function() {
             /* TODO check usages */
             form.getField = function (name) {
                 return form[PARAM_ELEMENTS][name];
+            };
+
+            form.asFormData = function () {
+                var formData = new FormData();
+                objEach(form[PARAM_ELEMENTS], function(name, elem) {
+                    var val = getFieldValueByName(form, name);
+                    if (isArray(val)) {
+                        for (var i = 0; i < val.length; i++) {
+                            formData.append(name, fieldValue.getValueRecoursively(val[i]));
+                        }
+                    } else {
+                        formData.append(name, val);
+                    }
+                });
+
+                var xhr = new XMLHttpRequest();
+                // Open the connection.
+                xhr.open('POST', form[PARAM_ACTION], true);
+
+                // Set up a handler for when the request finishes.
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        // File(s) uploaded.
+                    } else {
+                        alert('An error occurred!');
+                    }
+                };
+
+                // Send the Data.
+                xhr.send(formData);
+
+                return formData;
+            };
+
+            form.isValid = function () {
+                var validationObj = form.validate();
+
+                var result = true;
+                _each.call(validationObj, function(fieldName, res) {
+                    if (res !== true) {
+                        result = false;
+                        return false;
+                    }
+                });
+                return result;
             };
 
             /* function is called before every submition or onChange */
@@ -1506,6 +1644,9 @@ Forms = (function() {
             /* making a convenient elements object */
             form[PARAM_ELEMENTS] = {};
             for (var i = 0, elem; elem = form[PARAM_CONTAINER][i]; i++) {
+                if (elem.name == '') {
+                    continue;
+                }
                 if (form[PARAM_ELEMENTS][elem.name]) {
                     if (isArray(form[PARAM_ELEMENTS][elem.name])) {
                         form[PARAM_ELEMENTS][elem.name].push(elem);
@@ -1517,7 +1658,7 @@ Forms = (function() {
                 }
             }
 
-            setFormData(form, form[PARAM_CONFIG][PARAM_DATA], !1, 1);
+            setFormData(form, form[PARAM_CONFIG][PARAM_DATA], 0, 1);
 
             if (opt[PARAM_CONFIG][PARAM_ON_INIT]) {
                 opt[PARAM_CONFIG][PARAM_ON_INIT](form);
@@ -1548,6 +1689,10 @@ Forms = (function() {
         remove: function (id) {
             if (formsList[id]) delete formsList[id]
         },
+        getForm: function(id) {
+            return formsList[id];
+        },
+        list: formsList,
         getList: function () {
             return formsList
         },
