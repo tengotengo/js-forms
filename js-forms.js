@@ -105,6 +105,7 @@ Forms = (function() {
         'select-one': null,
         hidden: '',
         text: '',
+        password: '',
         textarea: '',
         radio: null,
         checkbox: null
